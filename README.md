@@ -38,16 +38,44 @@ indexing, analytics — stays inside each consuming app. That HTTP boundary is w
 lets one engine serve apps on completely different stacks (react-router/Vercel,
 astro/Fly) without caring which.
 
-## Phase 0 status (this scaffold)
+## Status
 
 | Piece | State |
 |---|---|
-| Tenancy + cache-key migration | ✅ real, review-ready |
-| `@pseo/numerology-core` (ported from sochudao) | ✅ real |
-| Generic gate runner | 🟡 per-item gates implemented; similarity + phrase_frequency stubbed |
-| sochumenh template seed (schema + guards + prompts) | ✅ real, loadable |
-| `prose-generate` / `prose-admin` / `content-api` | 🟡 stubs with responsibilities + TODOs |
-| Admin UI | ⬜ not started |
+| Tenancy + cache-key migrations (`0001`, `0002` webhooks + usage RPC) | ✅ implemented |
+| `@pseo/numerology-core` (vetted harmony matrix, unit + golden tests) | ✅ implemented |
+| Generic gate runner (per-item + `similarity`/`phrase_frequency` batch gates) | ✅ implemented |
+| `prose-generate` (strict tool use, constraint notes, cache, gates) | ✅ implemented |
+| `prose-admin` (templates, jobs, run-loop, approve-blocks-on-fail, publish) | ✅ implemented |
+| `content-api` (published + webhooks, site-scoped keys) | ✅ implemented |
+| sochumenh seed + `scripts/load-seed.ts` | ✅ loadable |
+| Engine Supabase project provisioned + golden set generated | ⬜ ops step (WP1/WP6) |
+| Admin UI | ⬜ not started (API-complete without it) |
+
+## Running tests
+
+```sh
+# numerology-core (Node 22+, native type stripping)
+cd packages/numerology-core && npm test && npx tsc --noEmit -p .
+
+# edge functions (Deno 2)
+cd supabase/functions && deno test --allow-read tests/
+deno check prose-generate/index.ts prose-admin/index.ts content-api/index.ts
+```
+
+## Deploying
+
+Functions resolve `@pseo/numerology-core` through `supabase/functions/deno.json`
+(import map → `packages/numerology-core/src`), keeping one math implementation
+for engine and sites. Deploy with `supabase functions deploy <name>`; secrets:
+`ANTHROPIC_API_KEY` on **prose-generate only**, `SUPABASE_URL` +
+`SUPABASE_SERVICE_ROLE_KEY` on all three. Run migrations with
+`supabase db push`, then load tenant #1:
+
+```sh
+SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… \
+  deno run --allow-net --allow-env --allow-read scripts/load-seed.ts seeds/sochumenh
+```
 
 ## Build order
 
