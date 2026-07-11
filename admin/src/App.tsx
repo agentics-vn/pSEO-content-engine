@@ -173,9 +173,19 @@ function Dashboard({ source, onLogout }: { source: DataSource; onLogout: () => v
             onAct={act}
             onNewJob={() => setDialog(true)}
             onRun={async (job) => {
+              // Each run invocation is wall-clock-bounded server-side; keep
+              // re-invoking while it makes progress so one click drains the job.
               notify(`Running job ${job.id.slice(0, 8)}…`);
-              const res = await source.runJob(job.id);
-              notify(res.ok ? `Job drained — ${res.remaining ?? 0} remaining` : res.error ?? 'run failed', !res.ok);
+              let last = Infinity;
+              for (let round = 0; round < 30; round++) {
+                const res = await source.runJob(job.id);
+                if (!res.ok) { notify(res.error ?? 'run failed', true); break; }
+                const remaining = res.remaining ?? 0;
+                if (remaining === 0) { notify('Job drained — batch gates ran'); break; }
+                if (remaining >= last) { notify(`${remaining} items keep failing — see job log`, true); break; }
+                last = remaining;
+                notify(`${remaining} items remaining…`);
+              }
               reload();
             }}
           />

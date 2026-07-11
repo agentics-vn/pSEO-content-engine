@@ -37,6 +37,37 @@ function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 }
 
+/**
+ * Webhook URLs must be public https endpoints. The engine POSTs to them from
+ * inside its own infrastructure, so a key holder must not be able to point a
+ * hook at localhost, the metadata service, or private ranges (SSRF).
+ */
+export function isPublicWebhookUrl(raw: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    return false;
+  }
+  if (url.protocol !== 'https:') return false;
+  if (url.username || url.password) return false;
+  const host = url.hostname.toLowerCase();
+  if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local') ||
+      host.endsWith('.internal') || host === 'metadata.google.internal') return false;
+  // IPv6 literal (URL keeps brackets off hostname) — reject wholesale.
+  if (host.includes(':')) return false;
+  const ip = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (ip) {
+    const [a, b] = [Number(ip[1]), Number(ip[2])];
+    if (a === 0 || a === 10 || a === 127 || a >= 224) return false;         // this-net, private, loopback, multicast+
+    if (a === 169 && b === 254) return false;                               // link-local / cloud metadata
+    if (a === 172 && b >= 16 && b <= 31) return false;                      // private
+    if (a === 192 && b === 168) return false;                               // private
+    if (a === 100 && b >= 64 && b <= 127) return false;                     // CGNAT
+  }
+  return host.includes('.') || ip !== null; // require a real hostname
+}
+
 export function makeContentApiHandler(deps: ContentApiDeps) {
   return async function handle(req: Request): Promise<Response> {
     const url = new URL(req.url);
@@ -83,8 +114,8 @@ export function makeContentApiHandler(deps: ContentApiDeps) {
       } catch {
         return json({ error: 'invalid JSON body' }, 400);
       }
-      if (!body.url || !/^https:\/\//.test(body.url)) {
-        return json({ error: 'url (https) required' }, 400);
+      if (!body.url || !isPublicWebhookUrl(body.url)) {
+        return json({ error: 'url must be a public https endpoint' }, 400);
       }
       const hook = await deps.registerWebhook(site.id, body.url);
       return json({ ok: true, webhook_id: hook.id }, 201);

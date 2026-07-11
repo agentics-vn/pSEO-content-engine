@@ -41,6 +41,14 @@ export interface TemplateInput {
 export interface JobInput {
   template_key: string;
   template_version?: number;
+  /**
+   * The tenant-generic work-list: explicit rows of (item_key, input_data).
+   * This is how ANY vertical onboards with zero engine code — the client's
+   * backend (or a CSV import in the admin UI) supplies the structured data
+   * each page stands on, and the engine hashes it into the cache key.
+   */
+  items?: Array<{ item_key: string; input_data: Record<string, unknown> }>;
+  /** Convenience for keys resolvable by a built-in input builder (combo axis). */
   item_keys?: string[];
   /** 'combo-grid' enumerates the full 12×12 axis minus already-published. */
   enumerate?: 'combo-grid';
@@ -51,6 +59,12 @@ export interface JobInput {
   };
   review_sample_pct?: number;
   mode?: 'generate' | 'regenerate';
+}
+
+/** editor: templates/jobs; reviewer: + review actions; owner: everything. */
+const ROLE_RANK: Record<string, number> = { editor: 1, reviewer: 2, owner: 3 };
+function atLeast(role: string, needed: 'editor' | 'reviewer'): boolean {
+  return (ROLE_RANK[role] ?? 0) >= ROLE_RANK[needed];
 }
 
 export interface AdminItemRow {
@@ -169,6 +183,12 @@ export function makeAdminHandler(deps: AdminDeps, opts: { runBudgetMs?: number }
     const body = async <T>(): Promise<T> => (await req.json()) as T;
 
     try {
+      // Write endpoints require at least editor; review actions reviewer+.
+      const isWrite = req.method === 'POST';
+      if (isWrite && !atLeast(site.role, 'editor')) {
+        return json({ error: `role "${site.role}" cannot modify the pipeline` }, 403);
+      }
+
       // ── POST /templates — create/version (immutable per version) ─────────
       if (req.method === 'POST' && path === '/templates') {
         const t = await body<TemplateInput>();
@@ -193,53 +213,67 @@ export function makeAdminHandler(deps: AdminDeps, opts: { runBudgetMs?: number }
         const template = await deps.getTemplate(site.site_id, j.template_key, version);
         if (!template) return json({ error: `no template "${j.template_key}" v${version}` }, 404);
 
-        let itemKeys: string[];
-        if (j.enumerate === 'combo-grid') {
-          const f = j.filter ?? {};
-          itemKeys = enumerateComboGrid()
-            .filter(({ lifePath, destiny }) => {
-              if (f.master === 'exclude' && (isMaster(lifePath) || isMaster(destiny))) return false;
-              if (f.master === 'only' && !(isMaster(lifePath) || isMaster(destiny))) return false;
-              if (f.life_paths && !f.life_paths.includes(lifePath as number)) return false;
-              if (f.destinies && !f.destinies.includes(destiny as number)) return false;
-              return true;
-            })
-            .map(({ lifePath, destiny }) => comboSlug(lifePath as CoreNumber, destiny as CoreNumber));
-        } else if (j.item_keys?.length) {
-          itemKeys = j.item_keys;
+        // Build the work-list: explicit (item_key, input_data) rows are the
+        // tenant-generic path; item_keys/enumerate resolve through the
+        // built-in combo input builder.
+        let workList: Array<{ item_key: string; input_data: Record<string, unknown> }>;
+        if (j.items?.length) {
+          const bad = j.items.find((it) => !it.item_key || !/^[a-z0-9][a-z0-9-]*$/.test(it.item_key)
+            || !it.input_data || typeof it.input_data !== 'object');
+          if (bad) return json({ error: `invalid work-list row (item_key must be a slug, input_data an object): ${JSON.stringify(bad).slice(0, 120)}` }, 400);
+          const keys = new Set(j.items.map((it) => it.item_key));
+          if (keys.size !== j.items.length) return json({ error: 'duplicate item_key in work-list' }, 400);
+          workList = j.items;
         } else {
-          return json({ error: 'item_keys or enumerate required' }, 400);
+          let itemKeys: string[];
+          if (j.enumerate === 'combo-grid') {
+            const f = j.filter ?? {};
+            itemKeys = enumerateComboGrid()
+              .filter(({ lifePath, destiny }) => {
+                if (f.master === 'exclude' && (isMaster(lifePath) || isMaster(destiny))) return false;
+                if (f.master === 'only' && !(isMaster(lifePath) || isMaster(destiny))) return false;
+                if (f.life_paths && !f.life_paths.includes(lifePath as number)) return false;
+                if (f.destinies && !f.destinies.includes(destiny as number)) return false;
+                return true;
+              })
+              .map(({ lifePath, destiny }) => comboSlug(lifePath as CoreNumber, destiny as CoreNumber));
+          } else if (j.item_keys?.length) {
+            itemKeys = j.item_keys;
+          } else {
+            return json({ error: 'items, item_keys, or enumerate required' }, 400);
+          }
+          workList = itemKeys.map((item_key) => ({
+            item_key,
+            input_data: buildComboInput(item_key) as unknown as Record<string, unknown>,
+          }));
         }
 
         // Filter out already-published keys (WP4: build-the-work-list step).
         const published = await deps.getPublishedItemKeys(site.site_id, j.template_key);
-        itemKeys = itemKeys.filter((k) => !published.has(k));
-        if (itemKeys.length === 0) return json({ error: 'work-list is empty after excluding published items' }, 400);
+        workList = workList.filter((w) => !published.has(w.item_key));
+        if (workList.length === 0) return json({ error: 'work-list is empty after excluding published items' }, 400);
 
         const job = await deps.insertJob({
           site_id: site.site_id,
           template_id: template.id,
           review_sample_pct: j.review_sample_pct ?? 25,
           mode: j.mode ?? 'generate',
-          item_count: itemKeys.length,
+          item_count: workList.length,
           created_by: userId,
         });
 
-        const rows = await Promise.all(itemKeys.map(async (item_key) => {
-          const input_data = buildComboInput(item_key);
-          return {
-            site_id: site.site_id,
-            job_id: job.id,
-            template_key: j.template_key,
-            template_version: version,
-            item_key,
-            data_hash: await dataHash(input_data),
-            input_data,
-            status: 'pending',
-          };
-        }));
+        const rows = await Promise.all(workList.map(async ({ item_key, input_data }) => ({
+          site_id: site.site_id,
+          job_id: job.id,
+          template_key: j.template_key,
+          template_version: version,
+          item_key,
+          data_hash: await dataHash(input_data),
+          input_data,
+          status: 'pending',
+        })));
         const inserted = await deps.insertItems(rows);
-        return json({ ok: true, job_id: job.id, item_count: itemKeys.length, inserted, deduped: itemKeys.length - inserted }, 201);
+        return json({ ok: true, job_id: job.id, item_count: workList.length, inserted, deduped: workList.length - inserted }, 201);
       }
 
       // ── POST /jobs/{id}/run — loop prose-generate, then batch gates ──────
@@ -251,12 +285,16 @@ export function makeAdminHandler(deps: AdminDeps, opts: { runBudgetMs?: number }
         const started = deps.now();
         let processed = 0;
         const failures: string[] = [];
-        // One item per generate invocation; loop until drained or out of budget.
+        // One item per generate invocation; loop until drained or out of
+        // budget. An item that errors stays pending in the DB — track it so
+        // THIS invocation never re-attempts it and spins its budget away.
+        const attempted = new Set<string>();
         while (deps.now() - started < runBudgetMs) {
-          const ids = await deps.getPendingItemIds(job.id, 5);
+          const ids = (await deps.getPendingItemIds(job.id, 25)).filter((id) => !attempted.has(id)).slice(0, 5);
           if (ids.length === 0) break;
           for (const id of ids) {
             if (deps.now() - started >= runBudgetMs) break;
+            attempted.add(id);
             const res = await deps.generate(id, job.mode);
             processed++;
             if (!res.ok) failures.push(`${id}: ${res.error}`);
@@ -312,6 +350,11 @@ export function makeAdminHandler(deps: AdminDeps, opts: { runBudgetMs?: number }
       const action = path.match(/^\/items\/([0-9a-f-]+)\/(approve|reject|publish|edit)$/);
       if (req.method === 'POST' && action) {
         const [, itemId, verb] = action;
+        // Review decisions are a reviewer/owner power — an editor can create
+        // templates and jobs but never move content toward publish.
+        if (!atLeast(site.role, 'reviewer')) {
+          return json({ error: `role "${site.role}" cannot ${verb} items` }, 403);
+        }
         const item = await deps.getItem(site.site_id, itemId);
         if (!item) return json({ error: 'item not found' }, 404);
 

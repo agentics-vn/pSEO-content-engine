@@ -178,7 +178,8 @@ const deps: AdminDeps = {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(payload),
-    }).catch(() => undefined); // webhook failure never blocks a publish
+      signal: AbortSignal.timeout(5000), // a slow consumer never blocks a publish
+    }).catch(() => undefined); // nor does a failing one
   },
 
   async listJobs(siteId, limit) {

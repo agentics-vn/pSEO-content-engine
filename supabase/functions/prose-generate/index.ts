@@ -23,7 +23,11 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 
 const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
-const anthropic = LLM_API_KEY ? new Anthropic({ apiKey: LLM_API_KEY }) : null;
+// maxRetries covers 429/5xx/529/connection errors with the SDK's exponential
+// backoff; the timeout keeps one stuck call from eating the whole invocation.
+const anthropic = LLM_API_KEY
+  ? new Anthropic({ apiKey: LLM_API_KEY, maxRetries: 4, timeout: 90_000 })
+  : null;
 
 /** Sampling params are rejected (400) on these model families — omit them. */
 function modelAcceptsTemperature(model: string): boolean {

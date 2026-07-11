@@ -19,7 +19,7 @@ interface World {
   generateCalls: string[];
 }
 
-function makeWorld(): World {
+function makeWorld(role: string = 'reviewer'): World {
   let seq = 0;
   const uid = () => `00000000-0000-0000-0000-${String(++seq).padStart(12, '0')}`;
   const items: World['items'] = new Map();
@@ -39,7 +39,7 @@ function makeWorld(): World {
   const deps: AdminDeps = {
     getUserId: (jwt) => Promise.resolve(jwt === 'good-jwt' ? 'user-1' : null),
     getMemberships: (userId) =>
-      Promise.resolve(userId === 'user-1' ? [{ site_id: 'site-1', slug: 'sochumenh', role: 'reviewer' }] : []),
+      Promise.resolve(userId === 'user-1' ? [{ site_id: 'site-1', slug: 'sochumenh', role }] : []),
 
     getLatestTemplateVersion: (siteId, key) => {
       const versions = [...templates.values()].filter((t) => t.site_id === siteId && t.key === key).map((t) => t.version);
@@ -188,6 +188,57 @@ Deno.test('admin: rejects missing/invalid tokens and non-members', async () => {
     headers: { authorization: 'Bearer wrong' },
   }));
   assertEquals(badJwt.status, 401);
+});
+
+// ── Roles ────────────────────────────────────────────────────────────────────
+
+Deno.test('roles: editor can create jobs but cannot approve/publish; unknown role cannot write', async () => {
+  const editor = makeWorld('editor');
+  const id = await seedItem(editor, { status: 'flagged' });
+  const job = await call(editor.deps, 'POST', '/jobs', {
+    template_key: 'combo-so-chu-dao-su-menh', item_keys: ['so-chu-dao-5-su-menh-5'],
+  });
+  assertEquals(job.status, 201);
+  assertEquals((await call(editor.deps, 'POST', `/items/${id}/approve`)).status, 403);
+  assertEquals((await call(editor.deps, 'POST', `/items/${id}/publish`)).status, 403);
+  assertEquals(editor.items.get(id)!.status, 'flagged');
+
+  const viewer = makeWorld('viewer');
+  assertEquals((await call(viewer.deps, 'POST', '/jobs', { template_key: 'x' })).status, 403);
+  assertEquals((await call(viewer.deps, 'GET', '/items')).status, 200, 'reads stay open to members');
+});
+
+// ── Tenant-generic work-lists ────────────────────────────────────────────────
+
+Deno.test('POST /jobs accepts explicit (item_key, input_data) rows — any vertical, zero engine code', async () => {
+  const w = makeWorld();
+  const res = await call(w.deps, 'POST', '/jobs', {
+    template_key: 'combo-so-chu-dao-su-menh', // any template; input builder not consulted
+    items: [
+      { item_key: 'gia-vang-ha-noi', input_data: { city: 'Hà Nội', price: 8_450_000, unit: 'VND/chỉ' } },
+      { item_key: 'gia-vang-da-nang', input_data: { city: 'Đà Nẵng', price: 8_430_000, unit: 'VND/chỉ' } },
+    ],
+  });
+  assertEquals(res.status, 201);
+  assertEquals((await res.json()).item_count, 2);
+  const rows = [...w.items.values()].filter((i) => i.item_key.startsWith('gia-vang'));
+  assertEquals(rows.length, 2);
+  assertEquals((rows[0].input_data as { city: string }).city, 'Hà Nội');
+  assert(rows.every((r) => r.data_hash.length === 64), 'input_data hashed into the cache key');
+});
+
+Deno.test('POST /jobs rejects malformed explicit rows', async () => {
+  const w = makeWorld();
+  const bad = await call(w.deps, 'POST', '/jobs', {
+    template_key: 'combo-so-chu-dao-su-menh',
+    items: [{ item_key: 'Bad Slug!', input_data: { a: 1 } }],
+  });
+  assertEquals(bad.status, 400);
+  const dup = await call(w.deps, 'POST', '/jobs', {
+    template_key: 'combo-so-chu-dao-su-menh',
+    items: [{ item_key: 'x', input_data: {} }, { item_key: 'x', input_data: {} }],
+  });
+  assertEquals(dup.status, 400);
 });
 
 // ── THE mandatory test (ground rule 1) ───────────────────────────────────────

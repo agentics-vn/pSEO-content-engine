@@ -4,7 +4,7 @@
  */
 
 import { assert, assertEquals } from './_assert.ts';
-import { makeContentApiHandler, type ContentApiDeps, type PublishedRow } from '../content-api/lib.ts';
+import { isPublicWebhookUrl, makeContentApiHandler, type ContentApiDeps, type PublishedRow } from '../content-api/lib.ts';
 import { sha256Hex } from '../_shared/hash.ts';
 
 const RAW_KEY_SOCHUMENH = 'key-sochumenh-raw-secret';
@@ -123,6 +123,26 @@ Deno.test('webhook registration requires https url and a valid key', async () =>
   const ok = await post(RAW_KEY_SOCHUMENH, { url: 'https://ok.example/hook' });
   assertEquals(ok.status, 201);
   assertEquals(webhooks, [{ site_id: 'site-1', url: 'https://ok.example/hook' }]);
+});
+
+Deno.test('webhook URLs: public https only — SSRF targets rejected', () => {
+  for (const ok of ['https://ci.example.com/hook', 'https://api.app-a.vn/internal/updated', 'https://8.8.8.8/x']) {
+    assert(isPublicWebhookUrl(ok), `should accept ${ok}`);
+  }
+  for (const bad of [
+    'http://ci.example.com/hook',            // not https
+    'https://localhost/hook', 'https://foo.localhost/x',
+    'https://127.0.0.1/x', 'https://10.1.2.3/x', 'https://192.168.1.10/x',
+    'https://172.16.0.9/x', 'https://169.254.169.254/latest/meta-data',
+    'https://metadata.google.internal/computeMetadata',
+    'https://100.100.1.1/x',                 // CGNAT
+    'https://[::1]/x', 'https://engine.internal/x', 'https://printer.local/x',
+    'https://user:pass@example.com/x',       // embedded credentials
+    'https://intranethost/x',                // no dot — unresolvable publicly
+    'not a url',
+  ]) {
+    assert(!isPublicWebhookUrl(bad), `should reject ${bad}`);
+  }
 });
 
 Deno.test('read-only surface: non-GET on /published is rejected', async () => {
