@@ -82,15 +82,21 @@ deno check prose-generate/index.ts prose-admin/index.ts content-api/index.ts
 
 Functions resolve `@pseo/numerology-core` through `supabase/functions/deno.json`
 (import map → `packages/numerology-core/src`), keeping one math implementation
-for engine and sites. Deploy with `supabase functions deploy <name>`; secrets:
-`ANTHROPIC_API_KEY` on **prose-generate only**, `SUPABASE_URL` +
-`SUPABASE_SERVICE_ROLE_KEY` on all three. Run migrations with
-`supabase db push`, then load tenant #1:
+for engine and sites. Deploy with `supabase functions deploy <name>`. The only
+secret you set by hand is `ANTHROPIC_API_KEY` (on **prose-generate**, the one
+function that calls the model) — `SUPABASE_URL` / `SUPABASE_ANON_KEY` /
+`SUPABASE_SERVICE_ROLE_KEY` are auto-injected into every edge function and the
+`SUPABASE_` prefix is reserved. Run migrations with `supabase db push`, then
+load tenant #1:
 
 ```sh
 SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… \
   deno run --allow-net --allow-env --allow-read scripts/load-seed.ts seeds/sochumenh
 ```
+
+**Live go-live checklist:** for the concrete steps against the current engine
+project (deploy the two remaining functions, secrets, admin login, seed load,
+end-to-end smoke test) see [`docs/DEPLOY.md`](docs/DEPLOY.md).
 
 ## Build order
 
