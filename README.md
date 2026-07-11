@@ -1,0 +1,78 @@
+# pSEO Content Engine
+
+A standalone, multi-tenant content generation + distribution service. Turns
+structured data (any repeatable unit — a day, a city, a number pair) into
+validated, on-brand prose at scale via LLMs, and serves it to independent
+consuming apps over one versioned HTTP contract. The engine never touches a
+consuming app's database and never holds its credentials.
+
+Full design: [`docs/architecture.md`](docs/architecture.md). This README is the
+build order.
+
+## Repo map
+
+```
+packages/numerology-core/   Shared deterministic math — SINGLE source of truth,
+                              imported by the engine AND every numerology tenant.
+supabase/
+  migrations/0001_…sql       Tenancy + content pipeline. Locks the critical cache
+                              key (site_id, template_key, version, item_key, hash).
+  functions/
+    prose-generate/          The ONLY holder of the LLM API key. One item/call.
+                              Strict tool use + constraint-notes + gates.
+    prose-admin/             Templates, jobs, review, approve (fail-gate block),
+                              one-way publish.
+    content-api/             The only external surface: GET /published + webhook,
+                              site-scoped bearer keys, read-only.
+    _shared/gates/           GENERIC validation gates — all domain rules arrive as
+                              data via each template's `guards` JSON.
+seeds/sochumenh/             Tenant #1: site record + the combo template
+                              (output_schema, guards, prompts) ready to load.
+```
+
+## Boundary (why this is a separate repo)
+
+The engine's entire contract with the outside world is: **one API, one webhook,
+one API-key system.** Everything downstream — page building, deploy, sitemaps,
+indexing, analytics — stays inside each consuming app. That HTTP boundary is what
+lets one engine serve apps on completely different stacks (react-router/Vercel,
+astro/Fly) without caring which.
+
+## Phase 0 status (this scaffold)
+
+| Piece | State |
+|---|---|
+| Tenancy + cache-key migration | ✅ real, review-ready |
+| `@pseo/numerology-core` (ported from sochudao) | ✅ real |
+| Generic gate runner | 🟡 per-item gates implemented; similarity + phrase_frequency stubbed |
+| sochumenh template seed (schema + guards + prompts) | ✅ real, loadable |
+| `prose-generate` / `prose-admin` / `content-api` | 🟡 stubs with responsibilities + TODOs |
+| Admin UI | ⬜ not started |
+
+## Build order
+
+1. **Stand up the engine Supabase project**, run `0001_engine_schema.sql`.
+2. **Implement `prose-generate`** — strict tool use against
+   `stripForStrict(output_schema)` + `constraintNotes()` (do NOT skip the notes —
+   §6.2), then `runItemGates()`. This is the sharpest-edged file; build it first.
+3. **Implement `prose-admin`** approve/publish — enforce the fail-gate block on
+   approve (§7).
+4. **Implement `content-api`** `GET /published` + key auth.
+5. **Load tenant #1** from `seeds/sochumenh/`: create the site, the template, issue
+   a read-only API key.
+6. **Golden set:** generate ~15 combos on a Sonnet-class model spanning all three
+   harmony classes + a master number; human-review to publish; distill approved
+   outputs into `few_shots`; switch the template `model` to Haiku for the rest.
+7. **Wire sochudao** to pull from `content-api` at build time (replaces its static
+   `COMBO_CONTENT` import) and keep its compile-time drift throw; extend it to
+   throw if any declared grid combo is missing from the pull.
+
+## Non-negotiables (learned the hard way — §7, §14)
+
+- **Approve refuses on a red fail-gate.** The block is on the approve step, not
+  just on editing published items.
+- **Same `numerology-core` on both sides.** Engine and site must compute identical
+  values or every page throws at build. This package is the only implementation.
+- **Cache key includes `site_id` and `template_version`.** Without the former,
+  two tenants naming a template alike collide; without the latter, a new
+  prompt/model silently reuses stale output.

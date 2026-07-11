@@ -1,0 +1,6 @@
+{
+  "slug": "sochumenh",
+  "name": "Số Chủ Mệnh",
+  "domain": "sochumenh.vn",
+  "notes": "Tenant #1. Consumes template combo-so-chu-dao-su-menh over content-api at build time; recomputes @pseo/numerology-core to assert no drift."
+}

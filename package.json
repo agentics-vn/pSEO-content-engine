@@ -1,0 +1,7 @@
+{
+  "name": "pseo-content-engine",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": ["packages/*"],
+  "description": "Multi-tenant programmatic-SEO content generation + distribution engine."
+}
