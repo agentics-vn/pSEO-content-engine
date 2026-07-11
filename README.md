@@ -40,28 +40,36 @@ astro/Fly) without caring which.
 
 ## Status
 
+Code is complete and tested; the live engine project
+(`mafqvoahltslxwttmvkn`) is mid-rollout. See [`docs/DEPLOY.md`](docs/DEPLOY.md)
+for the go-live checklist.
+
 | Piece | State |
 |---|---|
-| Tenancy + cache-key migrations (`0001`, `0002` webhooks + usage RPC) | ✅ implemented |
+| Tenancy + cache-key + performance migrations (`0001`–`0004`) | ✅ implemented · ✅ applied live |
+| Security lockdown (`0005` — `security_invoker` view, `service_role`-only RPCs) | ✅ implemented · ✅ applied live |
 | `@pseo/numerology-core` (vetted harmony matrix, unit + golden tests) | ✅ implemented |
 | Generic gate runner (per-item + `similarity`/`phrase_frequency` batch gates) | ✅ implemented |
-| `prose-generate` (strict tool use, constraint notes, cache, gates) | ✅ implemented |
-| `prose-admin` (templates, jobs, run-loop, approve-blocks-on-fail, publish) | ✅ implemented |
-| `content-api` (published + webhooks, site-scoped keys) | ✅ implemented |
-| sochumenh seed + `scripts/load-seed.ts` | ✅ loadable |
-| Engine Supabase project provisioned + golden set generated | ⬜ ops step (WP1/WP6) |
+| `prose-generate` (strict tool use, constraint notes, cache, gates) | ✅ implemented · ⬜ deploy (local, `docs/DEPLOY.md`) |
+| `prose-admin` (templates, jobs, run-loop, approve-blocks-on-fail, publish) | ✅ implemented · ⬜ deploy (local, `docs/DEPLOY.md`) |
+| `content-api` (published + webhooks, site-scoped keys) | ✅ implemented · ✅ deployed live (`ACTIVE`) |
+| sochumenh seed + `scripts/load-seed.ts` | ✅ loadable · ⬜ load (needs service-role key) |
+| `ANTHROPIC_API_KEY` secret + admin login + golden set | ⬜ ops step (WP6) |
+| Central GSC collector + per-project performance ingestion | ✅ implemented |
 | Admin UI (`admin/` — dashboard, review queue, jobs) | ✅ implemented |
+| Scheduled Routines (steward + GSC collector) | ⬜ enable after go-live |
 
 ## Admin UI
 
 `admin/` is a Vite + React SPA over the `prose-admin` API (design per the
 Be.run-style reference: cream canvas, white cards, charcoal panels,
-yellow/coral accents). Sign in with a Supabase admin account
-(`site_admins` membership) or click **Explore the demo world** to browse it
-with no engine deployed. Dashboard: generation bubbles, job-runs calendar,
-gate-pass-rate gauge (goal 90%, WP6 acceptance), 144-combo grid coverage, and
-the review queue with per-gate pill strips — approve/publish/reject inline
-(approve surfaces the 409 when a fail-severity gate is red).
+yellow/coral accents). Sign in with a Supabase admin account (`site_admins`
+membership) — it shows only live engine data. Dashboard: generation bubbles,
+job-runs calendar, gate-pass-rate gauge (goal 90%, WP6 acceptance), 144-combo
+grid coverage, and the review queue with per-gate pill strips —
+approve/publish/reject inline (approve surfaces the 409 when a fail-severity
+gate is red). Point it at the project with `VITE_SUPABASE_URL` +
+`VITE_SUPABASE_ANON_KEY` (see `docs/DEPLOY.md` §5).
 
 ```sh
 cd admin && npm install && npm run dev     # or npm run build → dist/
