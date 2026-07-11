@@ -7,7 +7,7 @@
   "types": "src/index.ts",
   "exports": { ".": "./src/index.ts" },
   "scripts": {
-    "test": "node --test",
+    "test": "node --test 'test/*.test.ts'",
     "typecheck": "tsc --noEmit"
   },
   "license": "UNLICENSED"

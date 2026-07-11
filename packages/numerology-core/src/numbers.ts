@@ -10,7 +10,7 @@
  * so per-number sections read as genuine prose, not one-line auto-fill.
  */
 
-import type { CoreNumber } from './core';
+import type { CoreNumber } from './core.ts';
 
 export interface NumberFacts {
   n: CoreNumber;

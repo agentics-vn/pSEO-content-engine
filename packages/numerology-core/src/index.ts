@@ -14,8 +14,8 @@
  * (which named `packages/numerology-core` as its intended home).
  */
 
-export * from './core';
-export * from './numbers';
+export * from './core.ts';
+export * from './numbers.ts';
 
 import {
   type CoreNumber,
@@ -25,8 +25,8 @@ import {
   comboHarmony,
   comboSlug,
   type Harmony,
-} from './core';
-import { getNumberFacts, type NumberFacts } from './numbers';
+} from './core.ts';
+import { getNumberFacts, type NumberFacts } from './numbers.ts';
 
 /** The complete computed fact-set for one Life-Path × Destiny combo. */
 export interface ComboFacts {
