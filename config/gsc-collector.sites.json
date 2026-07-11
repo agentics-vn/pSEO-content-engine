@@ -1,0 +1,11 @@
+{
+  "_comment": "Central GSC collector config — one entry per project. key_env names the environment variable holding that site's content-api key (never the key itself). Add an entry + the two GSC/env steps in docs/GSC-SETUP.md to onboard a project.",
+  "sites": [
+    {
+      "slug": "sochumenh",
+      "gsc_property": "sc-domain:sochumenh.vn",
+      "pages_prefix": "/than-so-hoc/",
+      "key_env": "SOCHUMENH_CONTENT_KEY"
+    }
+  ]
+}
