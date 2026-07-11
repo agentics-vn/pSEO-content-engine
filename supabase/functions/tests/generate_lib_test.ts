@@ -100,8 +100,11 @@ Deno.test('fillTemplate throws on an unknown placeholder instead of shipping it'
 
 Deno.test('resolveGuards fills guard tokens so the gates stay domain-blind', () => {
   const resolved = resolveGuards(seed.guards, facts) as Record<string, any>;
-  assertEquals(resolved.required_mentions.rules[0].must_contain, ['7', '3']);
-  assertEquals(resolved.required_mentions.rules[1].must_contain, ['4']);
+  const rule = (field: string) =>
+    resolved.required_mentions.rules.find((r: { field: string }) => r.field === field);
+  assertEquals(rule('metaDescription').must_contain, ['7', '3']);
+  assertEquals(rule('seoTitle').must_contain, ['7', '3']);
+  assertEquals(rule('linkingInsight').must_contain, ['4']);
   assertEquals(resolved.faq_shape.answers_must_contain, ['4', '1']);
 });
 
@@ -148,6 +151,8 @@ Deno.test('reviewSampleHit is deterministic and respects bounds', () => {
 function validItem(): Record<string, unknown> {
   const pad = (base: string, n: number) => (base + ' bình an và sáng suốt trong hành trình. ').repeat(50).slice(0, n);
   return {
+    title: 'Số chủ đạo 7 và số sứ mệnh 3',
+    seoTitle: 'Số chủ đạo 7 và số sứ mệnh 3 nghĩa là gì?',
     tagline: 'Nhà tư duy 7 gặp Người sáng tạo 3 — chiều sâu gặp biểu đạt',
     metaDescription: pad('Số chủ đạo 7 và số sứ mệnh 3: chiều sâu nội tâm gặp sức biểu đạt.', 150),
     intro: pad('Người mang tổ hợp 7 và 3 sống giữa chiều sâu và biểu đạt.', 500),
