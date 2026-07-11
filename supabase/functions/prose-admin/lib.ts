@@ -115,6 +115,15 @@ export interface AdminDeps {
   getWebhooks(siteId: string): Promise<Array<{ url: string }>>;
   fireWebhook(url: string, payload: unknown): Promise<void>;
 
+  /** Dashboard reads. */
+  listJobs(siteId: string, limit: number): Promise<Array<Record<string, unknown>>>;
+  getStats(siteId: string): Promise<{
+    items_by_status: Record<string, number>;
+    published_total: number;
+    tokens_in: number;
+    tokens_out: number;
+  }>;
+
   /** Milliseconds of budget left for the run loop (serverless wall clock). */
   now(): number;
 }
@@ -276,6 +285,16 @@ export function makeAdminHandler(deps: AdminDeps, opts: { runBudgetMs?: number }
           batchGatesRan = true;
         }
         return json({ ok: true, processed, remaining, batch_gates_ran: batchGatesRan, failures });
+      }
+
+      // ── GET /jobs, GET /stats — dashboard reads ──────────────────────────
+      if (req.method === 'GET' && path === '/jobs') {
+        const jobs = await deps.listJobs(site.site_id, Number(url.searchParams.get('limit') ?? 20));
+        return json({ ok: true, jobs });
+      }
+      if (req.method === 'GET' && path === '/stats') {
+        const stats = await deps.getStats(site.site_id);
+        return json({ ok: true, ...stats });
       }
 
       // ── GET /items — review queue ────────────────────────────────────────

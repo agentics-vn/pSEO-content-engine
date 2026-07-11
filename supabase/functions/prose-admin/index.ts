@@ -181,6 +181,33 @@ const deps: AdminDeps = {
     }).catch(() => undefined); // webhook failure never blocks a publish
   },
 
+  async listJobs(siteId, limit) {
+    const { data, error } = await supabase.from('prose_jobs')
+      .select('id, status, mode, item_count, review_sample_pct, tokens_in, tokens_out, created_at, finished_at, prose_templates ( key, version )')
+      .eq('site_id', siteId).order('created_at', { ascending: false }).limit(limit);
+    if (error) throw error;
+    return data ?? [];
+  },
+  async getStats(siteId) {
+    const byStatus: Record<string, number> = {};
+    for (const status of ['pending', 'generated', 'flagged', 'failed_validation', 'approved', 'rejected', 'published']) {
+      const { count, error } = await supabase.from('prose_items')
+        .select('id', { count: 'exact', head: true })
+        .eq('site_id', siteId).eq('status', status);
+      if (error) throw error;
+      byStatus[status] = count ?? 0;
+    }
+    const { data: tokens, error: tErr } = await supabase.from('prose_jobs')
+      .select('tokens_in, tokens_out').eq('site_id', siteId);
+    if (tErr) throw tErr;
+    return {
+      items_by_status: byStatus,
+      published_total: byStatus.published,
+      tokens_in: (tokens ?? []).reduce((s, j) => s + Number(j.tokens_in), 0),
+      tokens_out: (tokens ?? []).reduce((s, j) => s + Number(j.tokens_out), 0),
+    };
+  },
+
   now: () => Date.now(),
 };
 

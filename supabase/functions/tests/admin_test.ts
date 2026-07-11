@@ -131,6 +131,19 @@ function makeWorld(): World {
       return Promise.resolve({ ok: true, status: 'generated' });
     },
 
+    listJobs: (siteId, limit) =>
+      Promise.resolve([...jobs.values()].filter((j) => j.site_id === siteId).slice(0, limit) as unknown as Array<Record<string, unknown>>),
+    getStats: (siteId) => {
+      const byStatus: Record<string, number> = {};
+      for (const it of items.values()) {
+        if (it.site_id !== siteId) continue;
+        byStatus[it.status] = (byStatus[it.status] ?? 0) + 1;
+      }
+      return Promise.resolve({
+        items_by_status: byStatus, published_total: byStatus.published ?? 0, tokens_in: 0, tokens_out: 0,
+      });
+    },
+
     getWebhooks: () => Promise.resolve([{ url: 'https://site.example/hook' }]),
     fireWebhook: (url, payload) => {
       webhookCalls.push({ url, payload });
@@ -344,6 +357,21 @@ Deno.test('re-running a drained job is idempotent: cached generates, no new pend
 });
 
 // ── Review queue ─────────────────────────────────────────────────────────────
+
+Deno.test('GET /jobs and GET /stats serve the dashboard, site-scoped', async () => {
+  const w = makeWorld();
+  await seedItem(w, { status: 'published', item_key: 'so-chu-dao-1-su-menh-1' });
+  await seedItem(w, { status: 'flagged', item_key: 'so-chu-dao-1-su-menh-2' });
+  await call(w.deps, 'POST', '/jobs', { template_key: 'combo-so-chu-dao-su-menh', item_keys: ['so-chu-dao-1-su-menh-3'] });
+
+  const jobs = await (await call(w.deps, 'GET', '/jobs')).json();
+  assertEquals(jobs.jobs.length, 1);
+
+  const stats = await (await call(w.deps, 'GET', '/stats')).json();
+  assertEquals(stats.published_total, 1);
+  assertEquals(stats.items_by_status.flagged, 1);
+  assertEquals(stats.items_by_status.pending, 1);
+});
 
 Deno.test('GET /items?status=flagged returns only flagged items for the caller site', async () => {
   const w = makeWorld();

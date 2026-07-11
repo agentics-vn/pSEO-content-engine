@@ -50,7 +50,22 @@ astro/Fly) without caring which.
 | `content-api` (published + webhooks, site-scoped keys) | ✅ implemented |
 | sochumenh seed + `scripts/load-seed.ts` | ✅ loadable |
 | Engine Supabase project provisioned + golden set generated | ⬜ ops step (WP1/WP6) |
-| Admin UI | ⬜ not started (API-complete without it) |
+| Admin UI (`admin/` — dashboard, review queue, jobs) | ✅ implemented |
+
+## Admin UI
+
+`admin/` is a Vite + React SPA over the `prose-admin` API (design per the
+Be.run-style reference: cream canvas, white cards, charcoal panels,
+yellow/coral accents). Sign in with a Supabase admin account
+(`site_admins` membership) or click **Explore the demo world** to browse it
+with no engine deployed. Dashboard: generation bubbles, job-runs calendar,
+gate-pass-rate gauge (goal 90%, WP6 acceptance), 144-combo grid coverage, and
+the review queue with per-gate pill strips — approve/publish/reject inline
+(approve surfaces the 409 when a fail-severity gate is red).
+
+```sh
+cd admin && npm install && npm run dev     # or npm run build → dist/
+```
 
 ## Running tests
 
