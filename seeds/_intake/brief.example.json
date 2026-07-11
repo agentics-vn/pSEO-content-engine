@@ -1,0 +1,57 @@
+{
+  "_comment": "Client intake brief — the ONLY per-tenant input Seat 1 needs. Copy to seeds/<client>/brief.json, fill it with the client, then run the author-template skill. Fields marked (human) cannot be invented by an agent and must come from real tools or the client.",
+
+  "client": {
+    "name": "Giá Vàng 24h",
+    "site_slug": "giavang24h",
+    "domain": "giavang24h.vn",
+    "language": "vi",
+    "product": "price-alert subscription",
+    "cta": "Đăng ký nhận cảnh báo giá"
+  },
+
+  "axis": {
+    "_comment": "(human) The enumerable data axis behind the pages. No axis → decline.",
+    "unit": "city × metal type",
+    "enumeration": "63 provinces × {SJC, nhẫn 9999}",
+    "facts_source": "client's price API, refreshed daily",
+    "fact_fields": ["city", "metal", "price_buy", "price_sell", "delta_24h", "updated_at"]
+  },
+
+  "keywords": {
+    "_comment": "(human) Real query data — export from Keyword Planner / GSC / Ahrefs. Sample rows here; full CSV alongside as keywords.csv.",
+    "head_term": "giá vàng hôm nay",
+    "sample": [
+      { "query": "giá vàng hôm nay hà nội", "volume_mo": 40000, "maps_to": "gia-vang-sjc-ha-noi" },
+      { "query": "giá vàng nhẫn 9999 đà nẵng", "volume_mo": 5400, "maps_to": "gia-vang-nhan-da-nang" }
+    ]
+  },
+
+  "serp_refs": {
+    "_comment": "Top-ranking URLs for 3–5 target queries; the agent reads these to derive the schema.",
+    "urls": ["https://example-competitor-1.vn/gia-vang-ha-noi", "https://example-competitor-2.vn/..."]
+  },
+
+  "hub_and_spoke": {
+    "hub_pages": ["/gia-vang/ (head term — hand-written in site repo)", "/gia-vang/<metal>/ (per-metal hubs)"],
+    "sibling_rule": "each city page links to 3 nearest provinces, same metal"
+  },
+
+  "voice": {
+    "persona": "a calm market analyst, not a hype channel",
+    "tone": "factual, ngắn gọn, không giật tít",
+    "do_not": ["dự đoán giá chắc chắn", "khuyến nghị đầu tư", "so sánh nhà vàng cụ thể tiêu cực"]
+  },
+
+  "compliance": {
+    "_comment": "(human) Legal/brand red lines → banned_phrases guard.",
+    "banned_phrases": ["chắc chắn tăng", "chắc chắn giảm", "cam kết lợi nhuận", "nên mua ngay"]
+  },
+
+  "rollout": {
+    "golden_set": "8 cities across regions + both metals, review_sample_pct 100",
+    "phase_1": "top-20 cities by volume",
+    "phase_2": "remainder",
+    "refresh": "daily price rows re-posted (hash regenerates); prose refresh quarterly via template_version"
+  }
+}

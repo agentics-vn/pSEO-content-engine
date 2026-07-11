@@ -26,6 +26,13 @@ Prints a read-only, site-scoped API key once → goes into the client site's
 build secrets. Add their reviewers to `site_admins` (`editor` builds
 templates/jobs, `reviewer` approves/publishes, `owner` = both).
 
+> **Productized path:** collect `seeds/<client>/brief.json` (copy
+> `seeds/_intake/brief.example.json`), then run the `author-template` skill —
+> it executes steps 2–3 as a reviewable PR (schema, guards, prompts, golden
+> work-list, rollout plan). For step 5, `node scripts/generate-integration-kit.mjs
+> seeds/<client> <out>` emits the site-repo starter kit (pull-and-throw
+> script, page stub per schema field, FAQPage JSON-LD, checklist).
+
 ## Step 2 — author the template (the actual craft)
 
 One template = one page shape. Fill in:
