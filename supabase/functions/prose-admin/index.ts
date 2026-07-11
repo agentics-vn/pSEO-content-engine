@@ -182,6 +182,35 @@ const deps: AdminDeps = {
     }).catch(() => undefined); // nor does a failing one
   },
 
+  async getMetricsSummary(siteId, sinceDate) {
+    const { data, error } = await supabase.rpc('item_metrics_summary', {
+      p_site_id: siteId, p_since: sinceDate,
+    });
+    if (error) throw error;
+    return (data ?? []).map((r: Record<string, unknown>) => ({
+      item_key: r.item_key as string,
+      clicks: Number(r.clicks ?? 0),
+      impressions: Number(r.impressions ?? 0),
+      avg_position: r.avg_position === null ? null : Number(r.avg_position),
+      conversions: Number(r.conversions ?? 0),
+      revenue: Number(r.revenue ?? 0),
+    }));
+  },
+  async getItemKeysForTemplate(siteId, templateKey) {
+    const { data, error } = await supabase.from('prose_items')
+      .select('item_key').eq('site_id', siteId).eq('template_key', templateKey);
+    if (error) throw error;
+    return new Set((data ?? []).map((r) => r.item_key as string));
+  },
+  async getRecentItemOutcomes(siteId, templateKey, limit) {
+    const { data, error } = await supabase.from('prose_items')
+      .select('status, validation')
+      .eq('site_id', siteId).eq('template_key', templateKey).neq('status', 'pending')
+      .order('updated_at', { ascending: false }).limit(limit);
+    if (error) throw error;
+    return (data ?? []) as Array<{ status: string; validation: { gates?: [] } }>;
+  },
+
   async listJobs(siteId, limit) {
     const { data, error } = await supabase.from('prose_jobs')
       .select('id, status, mode, item_count, review_sample_pct, tokens_in, tokens_out, created_at, finished_at, prose_templates ( key, version )')

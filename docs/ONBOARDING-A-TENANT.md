@@ -145,3 +145,30 @@ optional pattern only; it is not part of the standard static-tenant flow.
 
 Never grant a project direct access to the engine DB (keys, connection
 strings, or PostgREST) — the API + site-scoped key is the entire contract.
+
+## The performance loop (what makes this optimization, not publishing)
+
+Per tenant, weekly and automatic once the kit's workflow is wired:
+
+```
+site CI: report-performance.mjs (GSC, per page) ─┐
+site backend: analytics rollups (utm_content =   ├→ POST /v1/sites/<slug>/metrics
+              item_key → conversions, revenue) ──┘        (site-scoped key)
+                                                              │
+engine: page_metrics → GET /metrics → admin "Search Performance" card
+                                                              │
+decisions: refresh bottom performers (new template_version), expand winners
+(new spokes), rank the next batch by revenue per cluster — not by volume
+```
+
+Adaptive sampling closes the other loop: jobs created without an explicit
+`review_sample_pct` derive one from the template's recent first-pass gate
+rate (<15 items → 100%; ≥95% → 10%; ≥99% → 5%; else 25%). Auto-flagged items
+always reach review regardless — this only tunes the random sample on clean
+items. Reviewer hours are the unit economics; spend them where the model
+still fails and where the money is.
+
+Answer-engine distribution ships from the same atoms: the kit's
+`generate-feeds.mjs` emits `public/llms.txt` + `public/feeds/<template>.json`
+at build time — extractable, fact-backed Q&A for AI Overviews/Perplexity-class
+engines, and the structural hedge against pure blue-link dependence.

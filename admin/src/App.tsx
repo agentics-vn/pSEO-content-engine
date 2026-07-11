@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { DashboardData, DataSource, ReviewItem, JobRow } from './types';
+import type { DashboardData, DataSource, MetricsSummary, ReviewItem, JobRow } from './types';
 import { DemoSource, RemoteSource, savedConfig } from './api';
 import {
   IconArchive, IconBell, IconCalendar, IconChevron, IconDoc, IconDots, IconFlag,
@@ -90,11 +90,15 @@ function Login({ onReady }: { onReady: (s: DataSource) => void }) {
 
 function Dashboard({ source, onLogout }: { source: DataSource; onLogout: () => void }) {
   const [data, setData] = useState<DashboardData | null>(null);
+  const [perf, setPerf] = useState<MetricsSummary | null>(null);
   const [query, setQuery] = useState('');
   const [toast, setToast] = useState<{ msg: string; err: boolean } | null>(null);
   const [dialog, setDialog] = useState(false);
 
-  const reload = () => source.load().then(setData);
+  const reload = () => {
+    source.load().then(setData);
+    source.metrics().then(setPerf).catch(() => setPerf(null));
+  };
   useEffect(() => { reload(); }, [source]);
 
   const notify = (msg: string, err = false) => {
@@ -190,6 +194,8 @@ function Dashboard({ source, onLogout }: { source: DataSource; onLogout: () => v
             }}
           />
         </div>
+
+        {perf && <PerformanceCard perf={perf} />}
       </main>
 
       {dialog && (
@@ -404,6 +410,54 @@ function QueueCard({ review, jobs, onAct, onNewJob, onRun }: {
           ))}
         </div>
       )}
+    </section>
+  );
+}
+
+function PerformanceCard({ perf }: { perf: MetricsSummary }) {
+  const top = perf.items.slice(0, 4);
+  // Needs attention: measurable impressions but poor position/CTR.
+  const attention = [...perf.items]
+    .filter((r) => r.impressions >= 500 && (r.avg_position ?? 0) > 10)
+    .sort((a, b) => (b.avg_position ?? 0) - (a.avg_position ?? 0))
+    .slice(0, 4);
+  const t = perf.totals;
+
+  const Row = ({ r, accent }: { r: MetricsSummary['items'][0]; accent: string }) => (
+    <div className="perf-row">
+      <i style={{ background: accent }} />
+      <span className="key">{prettyKey(r.item_key)}</span>
+      <span className="num">{fmt(r.clicks)} clicks</span>
+      <span className="num">pos {r.avg_position?.toFixed(1) ?? '—'}</span>
+      <span className="num rev">{r.revenue > 0 ? `₫${fmtK(r.revenue)}` : '—'}</span>
+    </div>
+  );
+
+  return (
+    <section className="card">
+      <div className="queue-head">
+        <div>
+          <h2>Search Performance</h2>
+          <div className="sub">Last {perf.window_days} days · refresh & batch decisions rank by this, not by volume</div>
+        </div>
+        <div className="perf-totals">
+          <span><b>{fmtK(t.clicks)}</b> clicks</span>
+          <span><b>{fmtK(t.impressions)}</b> impressions</span>
+          <span><b>{fmt(t.conversions)}</b> conversions</span>
+          <span className="rev"><b>₫{fmtK(t.revenue)}</b> revenue</span>
+        </div>
+      </div>
+      <div className="perf-cols">
+        <div>
+          <h3>Top pages</h3>
+          {top.map((r) => <Row key={r.item_key} r={r} accent="var(--yellow)" />)}
+        </div>
+        <div>
+          <h3>Needs attention (page 2+)</h3>
+          {attention.length === 0 && <div className="empty">Nothing ranking poorly with real impressions.</div>}
+          {attention.map((r) => <Row key={r.item_key} r={r} accent="var(--coral)" />)}
+        </div>
+      </div>
     </section>
   );
 }

@@ -67,6 +67,31 @@ function atLeast(role: string, needed: 'editor' | 'reviewer'): boolean {
   return (ROLE_RANK[role] ?? 0) >= ROLE_RANK[needed];
 }
 
+export interface ItemOutcome {
+  status: string;
+  validation: { gates?: GateResult[] };
+}
+
+/**
+ * Adaptive sampling: when a job omits review_sample_pct, derive it from the
+ * template's recent first-pass gate history. Human review is the unit
+ * economics of the whole pipeline — spend it where the model still fails.
+ * Auto-flagged items ALWAYS reach the queue regardless of this number; this
+ * only tunes the extra random-sample rate on clean items.
+ */
+export function computeAutoSamplePct(outcomes: ItemOutcome[]): { pct: number; basis: string } {
+  const considered = outcomes.filter((o) => o.status !== 'pending');
+  if (considered.length < 15) {
+    return { pct: 100, basis: `golden phase: only ${considered.length} generated items on record` };
+  }
+  const failures = considered.filter((o) =>
+    o.status === 'failed_validation' ||
+    (o.validation?.gates ?? []).some((g) => g.severity === 'fail' && !g.passed)).length;
+  const rate = 1 - failures / considered.length;
+  const pct = rate >= 0.99 ? 5 : rate >= 0.95 ? 10 : 25;
+  return { pct, basis: `first-pass rate ${(rate * 100).toFixed(1)}% over last ${considered.length} items` };
+}
+
 export interface AdminItemRow {
   id: string;
   site_id: string;
@@ -137,6 +162,19 @@ export interface AdminDeps {
     tokens_in: number;
     tokens_out: number;
   }>;
+
+  /** Performance loop reads. */
+  getMetricsSummary(siteId: string, sinceDate: string): Promise<Array<{
+    item_key: string;
+    clicks: number;
+    impressions: number;
+    avg_position: number | null;
+    conversions: number;
+    revenue: number;
+  }>>;
+  getItemKeysForTemplate(siteId: string, templateKey: string): Promise<Set<string>>;
+  /** Recent non-pending items of a template, newest first (for auto sampling). */
+  getRecentItemOutcomes(siteId: string, templateKey: string, limit: number): Promise<ItemOutcome[]>;
 
   /** Milliseconds of budget left for the run loop (serverless wall clock). */
   now(): number;
@@ -253,10 +291,21 @@ export function makeAdminHandler(deps: AdminDeps, opts: { runBudgetMs?: number }
         workList = workList.filter((w) => !published.has(w.item_key));
         if (workList.length === 0) return json({ error: 'work-list is empty after excluding published items' }, 400);
 
+        // Sampling: explicit value wins; otherwise adapt to the template's
+        // recent first-pass gate history.
+        let samplePct = j.review_sample_pct;
+        let sampleBasis = 'explicit';
+        if (samplePct === undefined) {
+          const outcomes = await deps.getRecentItemOutcomes(site.site_id, j.template_key, 200);
+          ({ pct: samplePct, basis: sampleBasis } = computeAutoSamplePct(outcomes));
+        } else if (samplePct < 0 || samplePct > 100) {
+          return json({ error: 'review_sample_pct must be 0–100' }, 400);
+        }
+
         const job = await deps.insertJob({
           site_id: site.site_id,
           template_id: template.id,
-          review_sample_pct: j.review_sample_pct ?? 25,
+          review_sample_pct: samplePct,
           mode: j.mode ?? 'generate',
           item_count: workList.length,
           created_by: userId,
@@ -273,7 +322,11 @@ export function makeAdminHandler(deps: AdminDeps, opts: { runBudgetMs?: number }
           status: 'pending',
         })));
         const inserted = await deps.insertItems(rows);
-        return json({ ok: true, job_id: job.id, item_count: workList.length, inserted, deduped: workList.length - inserted }, 201);
+        return json({
+          ok: true, job_id: job.id, item_count: workList.length,
+          inserted, deduped: workList.length - inserted,
+          review_sample_pct: samplePct, sample_basis: sampleBasis,
+        }, 201);
       }
 
       // ── POST /jobs/{id}/run — loop prose-generate, then batch gates ──────
@@ -333,6 +386,29 @@ export function makeAdminHandler(deps: AdminDeps, opts: { runBudgetMs?: number }
       if (req.method === 'GET' && path === '/stats') {
         const stats = await deps.getStats(site.site_id);
         return json({ ok: true, ...stats });
+      }
+
+      // ── GET /metrics — the performance loop's read side ──────────────────
+      if (req.method === 'GET' && path === '/metrics') {
+        const windowDays = Math.min(Math.max(Number(url.searchParams.get('window') ?? 28), 1), 180);
+        const since = new Date(Date.now() - windowDays * 86_400_000).toISOString().slice(0, 10);
+        let rows = await deps.getMetricsSummary(site.site_id, since);
+        const template = url.searchParams.get('template');
+        if (template) {
+          const keys = await deps.getItemKeysForTemplate(site.site_id, template);
+          rows = rows.filter((r) => keys.has(r.item_key));
+        }
+        const totals = rows.reduce((t, r) => ({
+          clicks: t.clicks + r.clicks,
+          impressions: t.impressions + r.impressions,
+          conversions: t.conversions + r.conversions,
+          revenue: t.revenue + r.revenue,
+        }), { clicks: 0, impressions: 0, conversions: 0, revenue: 0 });
+        // Sorted by clicks desc — the UI slices top/bottom; ctr precomputed.
+        const items = rows
+          .map((r) => ({ ...r, ctr: r.impressions > 0 ? r.clicks / r.impressions : null }))
+          .sort((a, b) => b.clicks - a.clicks);
+        return json({ ok: true, window_days: windowDays, totals, items });
       }
 
       // ── GET /items — review queue ────────────────────────────────────────

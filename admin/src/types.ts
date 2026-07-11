@@ -44,9 +44,26 @@ export interface DashboardData {
   review: ReviewItem[];
 }
 
+export interface MetricItem {
+  item_key: string;
+  clicks: number;
+  impressions: number;
+  avg_position: number | null;
+  conversions: number;
+  revenue: number;
+  ctr: number | null;
+}
+
+export interface MetricsSummary {
+  window_days: number;
+  totals: { clicks: number; impressions: number; conversions: number; revenue: number };
+  items: MetricItem[]; // sorted by clicks desc
+}
+
 /** The operator surface the UI needs — backed by prose-admin or demo data. */
 export interface DataSource {
   load(): Promise<DashboardData>;
+  metrics(): Promise<MetricsSummary | null>;
   approve(itemId: string): Promise<{ ok: boolean; error?: string }>;
   reject(itemId: string): Promise<{ ok: boolean; error?: string }>;
   publish(itemId: string): Promise<{ ok: boolean; error?: string }>;

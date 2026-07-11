@@ -337,6 +337,165 @@ jobs:
           service_account: \${{ vars.GCP_GSC_SERVICE_ACCOUNT }}
       - run: npm install --no-save google-auth-library
       - run: node scripts/index-coverage-report.mjs
+
+  performance:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: \${{ vars.GCP_WIF_PROVIDER }}
+          service_account: \${{ vars.GCP_GSC_SERVICE_ACCOUNT }}
+      - run: npm install --no-save google-auth-library
+      - run: node scripts/report-performance.mjs
+        env:
+          ENGINE_URL: \${{ vars.ENGINE_URL }}
+          ${KEY_ENV}: \${{ secrets.${KEY_ENV} }}
+          PAGES_PREFIX: / # ← set to the programmatic cluster's path prefix
+`);
+
+// ── Performance loop: GSC → engine metrics ───────────────────────────────────
+await write('scripts/report-performance.mjs', `/**
+ * Pull last-28-day per-page Search Analytics from GSC and post them to the
+ * engine as per-item_key metrics — the read side lives in the engine's admin
+ * dashboard and ranks refresh/batch decisions. Auth = same ADC as
+ * submit-sitemap.mjs. The GSC credential never leaves the site's CI.
+ *
+ *   GSC_PROPERTY='sc-domain:${DOMAIN}' PAGES_PREFIX='/than-so-hoc/' \\
+ *   ENGINE_URL=… ${KEY_ENV}=… node scripts/report-performance.mjs
+ */
+import { GoogleAuth } from 'google-auth-library';
+
+const PROPERTY = process.env.GSC_PROPERTY ?? 'sc-domain:${DOMAIN}';
+const PREFIX = process.env.PAGES_PREFIX ?? '/'; // path prefix of the programmatic cluster
+const ENGINE_URL = process.env.ENGINE_URL;
+const KEY = process.env.${KEY_ENV};
+if (!ENGINE_URL || !KEY) throw new Error('[perf] ENGINE_URL and ${KEY_ENV} required');
+
+const end = new Date(Date.now() - 2 * 86400000).toISOString().slice(0, 10);   // GSC lags ~2 days
+const start = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+
+const auth = new GoogleAuth({ scopes: ['https://www.googleapis.com/auth/webmasters.readonly'] });
+const client = await auth.getClient();
+const { data } = await client.request({
+  method: 'POST',
+  url: \`https://www.googleapis.com/webmasters/v3/sites/\${encodeURIComponent(PROPERTY)}/searchAnalytics/query\`,
+  data: { startDate: start, endDate: end, dimensions: ['page', 'date'], rowLimit: 25000 },
+});
+
+// page URL → item_key: last path segment of pages under PREFIX.
+const rows = (data.rows ?? []).flatMap((r) => {
+  const path = new URL(r.keys[0]).pathname;
+  if (!path.startsWith(PREFIX)) return [];
+  const item_key = path.replace(/\\/$/, '').split('/').pop();
+  if (!/^[a-z0-9][a-z0-9-]*$/.test(item_key)) return [];
+  return [{
+    item_key,
+    date: r.keys[1],
+    clicks: r.clicks,
+    impressions: r.impressions,
+    position: r.position,
+  }];
+});
+
+for (let i = 0; i < rows.length; i += 5000) {
+  const res = await fetch(\`\${ENGINE_URL}/v1/sites/${SLUG}/metrics\`, {
+    method: 'POST',
+    headers: { authorization: \`Bearer \${KEY}\`, 'content-type': 'application/json' },
+    body: JSON.stringify({ source: 'gsc', rows: rows.slice(i, i + 5000) }),
+  });
+  if (!res.ok) throw new Error(\`[perf] engine returned \${res.status}: \${await res.text()}\`);
+}
+console.log(\`[perf] posted \${rows.length} rows (\${start}…\${end}) → engine\`);
+`);
+
+await write('scripts/report-revenue.example.mjs', `/**
+ * Revenue attribution — EXAMPLE. Adapt to the site's analytics source; the
+ * contract is only the POST shape. Join key: your analytics' utm_content
+ * equals the page's item_key (already emitted by the page templates' CTAs).
+ *
+ * POST \${ENGINE_URL}/v1/sites/${SLUG}/metrics
+ * { "source": "analytics",
+ *   "rows": [{ "item_key": "…", "date": "YYYY-MM-DD",
+ *              "conversions": 3, "revenue": 1470000 }] }
+ *
+ * Example below reads a CSV export (item_key,date,conversions,revenue).
+ */
+import { readFile } from 'node:fs/promises';
+
+const [csvPath] = process.argv.slice(2);
+const ENGINE_URL = process.env.ENGINE_URL;
+const KEY = process.env.${KEY_ENV};
+if (!csvPath || !ENGINE_URL || !KEY) throw new Error('usage: ENGINE_URL=… ${KEY_ENV}=… report-revenue.example.mjs <csv>');
+
+const lines = (await readFile(csvPath, 'utf8')).trim().split('\\n').slice(1);
+const rows = lines.map((l) => {
+  const [item_key, date, conversions, revenue] = l.split(',');
+  return { item_key, date, conversions: Number(conversions), revenue: Number(revenue) };
+});
+const res = await fetch(\`\${ENGINE_URL}/v1/sites/${SLUG}/metrics\`, {
+  method: 'POST',
+  headers: { authorization: \`Bearer \${KEY}\`, 'content-type': 'application/json' },
+  body: JSON.stringify({ source: 'analytics', rows }),
+});
+if (!res.ok) throw new Error(\`engine returned \${res.status}: \${await res.text()}\`);
+console.log(\`posted \${rows.length} revenue rows\`);
+`);
+
+// ── Answer-engine distribution: llms.txt + structured feed ──────────────────
+await write('scripts/generate-feeds.mjs', `/**
+ * Emit answer-engine surfaces from the pulled snapshot — run in prebuild,
+ * AFTER pull-content.mjs. The engine's content atom is validated JSON, so
+ * the same atoms that render as pages also ship as:
+ *   public/llms.txt            — index for LLM crawlers (page → one-line gist)
+ *   public/feeds/${KEY}.json   — the structured atoms (title, description, faqs)
+ * This is the hedge against 10-blue-links dependence: extractable, fact-backed
+ * Q&A is what AI Overviews / Perplexity-class engines cite.
+ */
+import { readFile, writeFile, mkdir } from 'node:fs/promises';
+
+const BASE = (process.env.SITE_BASE_URL ?? 'https://${DOMAIN}').replace(/\\/$/, '');
+const PREFIX = process.env.PAGES_PREFIX ?? '/'; // must match the routes
+const SNAPSHOT = process.env.CONTENT_OUT ?? 'src/data/${KEY}.generated.json';
+
+const items = JSON.parse(await readFile(SNAPSHOT, 'utf8'));
+await mkdir('public/feeds', { recursive: true });
+
+const lines = [
+  '# ${site.name}',
+  '',
+  '> Programmatic pages backed by computed data; prose is generated, gate-',
+  '> checked, and human-reviewed before publish.',
+  '',
+  '## ${KEY}',
+  '',
+  ...items.map((it) => {
+    const title = it.output.seoTitle ?? it.output.title ?? it.item_key;
+    const gist = (it.output.metaDescription ?? '').slice(0, 160);
+    return \`- [\${title}](\${BASE}\${PREFIX}\${it.item_key}): \${gist}\`;
+  }),
+];
+await writeFile('public/llms.txt', lines.join('\\n') + '\\n');
+
+await writeFile('public/feeds/${KEY}.json', JSON.stringify({
+  site: '${SLUG}',
+  base_url: BASE,
+  template: '${KEY}',
+  generated_at: new Date().toISOString(),
+  items: items.map((it) => ({
+    item_key: it.item_key,
+    url: \`\${BASE}\${PREFIX}\${it.item_key}\`,
+    title: it.output.title ?? null,
+    description: it.output.metaDescription ?? null,
+    faqs: it.output.faqs ?? [],
+    updated_at: it.updated_at,
+  })),
+}, null, 2) + '\\n');
+
+console.log(\`[feeds] llms.txt (\${items.length} pages) + feeds/${KEY}.json written\`);
 `);
 
 // ── Checklist README ─────────────────────────────────────────────────────────
@@ -356,6 +515,8 @@ integrator section.
 - [ ] OG card per page (templated SVG→PNG from the page's facts)
 - [ ] Sitemap includes the cluster; \`.github/workflows/seo-index.yml\` wired (GSC WIF/SA auth + INDEXNOW_KEY secret + key file in public/; set your deploy workflow name) — submits on every deploy, weekly coverage report gates the next batch (§12)
 - [ ] Analytics: CTA/purchase events with UTM-tagged content→product links (§13)
+- [ ] Performance loop: weekly \`report-performance.mjs\` posts GSC rows per page to the engine (job in seo-index.yml; set PAGES_PREFIX + ENGINE_URL var + ${KEY_ENV} secret); revenue rows posted from analytics per \`report-revenue.example.mjs\` (join key: utm_content = item_key)
+- [ ] Answer-engine surfaces: \`generate-feeds.mjs\` in prebuild after the pull → \`public/llms.txt\` + \`public/feeds/${KEY}.json\`
 - [ ] Optional: register the CI webhook — POST /v1/sites/${SLUG}/webhooks with the site key
 `);
 

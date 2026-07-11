@@ -30,8 +30,13 @@ async function makeWorld() {
     { site_id: 'site-2', item_key: 'secret-item', template_key: 'combo-so-chu-dao-su-menh', template_version: 1, output: { intro: 'SECRET' }, updated_at: '2026-06-01T00:00:00Z' },
   ];
   const webhooks: Array<{ site_id: string; url: string }> = [];
+  const metricsWrites: Array<{ site_id: string; source: string; rows: unknown[] }> = [];
 
   const deps: ContentApiDeps = {
+    upsertMetrics: (siteId, source, rows) => {
+      metricsWrites.push({ site_id: siteId, source, rows });
+      return Promise.resolve(rows.length);
+    },
     getSiteBySlug: (slug) => Promise.resolve(sites.find((s) => s.slug === slug) ?? null),
     findKey: (siteId, keyHash) => {
       const k = keys.find((k) => k.site_id === siteId && k.key_hash === keyHash && !k.revoked);
@@ -48,7 +53,7 @@ async function makeWorld() {
       return Promise.resolve({ id: `wh-${webhooks.length}` });
     },
   };
-  return { deps, webhooks };
+  return { deps, webhooks, metricsWrites };
 }
 
 const get = (deps: ContentApiDeps, path: string, bearer?: string) =>
@@ -143,6 +148,54 @@ Deno.test('webhook URLs: public https only — SSRF targets rejected', () => {
   ]) {
     assert(!isPublicWebhookUrl(bad), `should reject ${bad}`);
   }
+});
+
+Deno.test('POST /metrics: valid rows upsert under the resolved site; bad input rejected', async () => {
+  const { deps, metricsWrites } = await makeWorld();
+  const handler = makeContentApiHandler(deps);
+  const post = (bearer: string, body: unknown) =>
+    handler(new Request('http://local/content-api/v1/sites/sochumenh/metrics', {
+      method: 'POST',
+      headers: { authorization: `Bearer ${bearer}`, 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    }));
+
+  const ok = await post(RAW_KEY_SOCHUMENH, {
+    source: 'gsc',
+    rows: [
+      { item_key: 'so-chu-dao-7-su-menh-3', date: '2026-07-10', clicks: 12, impressions: 300, position: 6.4 },
+      { item_key: 'so-chu-dao-1-su-menh-5', date: '2026-07-10', clicks: 3, impressions: 90, position: 11.2 },
+    ],
+  });
+  assertEquals(ok.status, 200);
+  assertEquals((await ok.json()).written, 2);
+  assertEquals(metricsWrites[0].site_id, 'site-1');
+
+  const revenue = await post(RAW_KEY_SOCHUMENH, {
+    source: 'analytics',
+    rows: [{ item_key: 'so-chu-dao-7-su-menh-3', date: '2026-07-10', conversions: 2, revenue: 980000 }],
+  });
+  assertEquals(revenue.status, 200);
+
+  assertEquals((await post(RAW_KEY_SOCHUMENH, { source: 'ahrefs', rows: [{}] })).status, 400, 'unknown source');
+  assertEquals((await post(RAW_KEY_SOCHUMENH, { source: 'gsc', rows: [] })).status, 400, 'empty rows');
+  assertEquals((await post(RAW_KEY_SOCHUMENH, {
+    source: 'gsc', rows: [{ item_key: 'x', date: '2026-07-10' }],
+  })).status, 400, 'row with no metrics');
+  assertEquals((await post(RAW_KEY_SOCHUMENH, {
+    source: 'gsc', rows: [{ item_key: 'x', date: '10/07/2026', clicks: 1 }],
+  })).status, 400, 'bad date format');
+  assertEquals((await post(RAW_KEY_SOCHUMENH, {
+    source: 'gsc', rows: [{ item_key: 'x', date: '2026-07-10', clicks: -5 }],
+  })).status, 400, 'negative metric');
+  assertEquals((await post(RAW_KEY_REVOKED, { source: 'gsc', rows: [{ item_key: 'x', date: '2026-07-10', clicks: 1 }] })).status, 401);
+  // Cross-site key cannot write metrics into another site.
+  const cross = await handler(new Request('http://local/content-api/v1/sites/othersite/metrics', {
+    method: 'POST',
+    headers: { authorization: `Bearer ${RAW_KEY_SOCHUMENH}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ source: 'gsc', rows: [{ item_key: 'x', date: '2026-07-10', clicks: 1 }] }),
+  }));
+  assertEquals(cross.status, 401);
 });
 
 Deno.test('read-only surface: non-GET on /published is rejected', async () => {

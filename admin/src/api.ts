@@ -5,7 +5,7 @@
  */
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import type { DashboardData, DataSource, GateResult, ReviewItem, JobRow } from './types';
+import type { DashboardData, DataSource, GateResult, MetricsSummary, ReviewItem, JobRow } from './types';
 
 export interface RemoteConfig {
   supabaseUrl: string;
@@ -76,6 +76,10 @@ export class RemoteSource implements DataSource {
     };
   }
 
+  metrics = async (): Promise<MetricsSummary | null> => {
+    const res = await this.call('GET', '/metrics?window=28');
+    return res.ok && res.items?.length ? res : null;
+  };
   approve = (id: string) => this.call('POST', `/items/${id}/approve`);
   reject = (id: string) => this.call('POST', `/items/${id}/reject`, {});
   publish = (id: string) => this.call('POST', `/items/${id}/publish`);
@@ -164,6 +168,30 @@ export class DemoSource implements DataSource {
       review: this.review,
     });
   }
+
+  metrics = (): Promise<MetricsSummary | null> => {
+    const mk = (item_key: string, clicks: number, impressions: number, pos: number, conversions: number, revenue: number) => ({
+      item_key, clicks, impressions, avg_position: pos, conversions, revenue,
+      ctr: impressions ? clicks / impressions : null,
+    });
+    const items = [
+      mk('so-chu-dao-7-su-menh-3', 1840, 21400, 4.2, 31, 15_190_000),
+      mk('so-chu-dao-1-su-menh-5', 1210, 16800, 5.1, 18, 8_820_000),
+      mk('so-chu-dao-9-su-menh-2', 880, 9400, 6.8, 11, 5_390_000),
+      mk('so-chu-dao-3-su-menh-3', 610, 8800, 7.9, 6, 2_940_000),
+      mk('so-chu-dao-8-su-menh-8', 95, 7100, 18.4, 0, 0),
+      mk('so-chu-dao-2-su-menh-4', 61, 5900, 23.1, 0, 0),
+      mk('so-chu-dao-6-su-menh-9', 44, 4100, 27.6, 1, 490_000),
+    ];
+    return Promise.resolve({
+      window_days: 28,
+      totals: items.reduce((t, r) => ({
+        clicks: t.clicks + r.clicks, impressions: t.impressions + r.impressions,
+        conversions: t.conversions + r.conversions, revenue: t.revenue + r.revenue,
+      }), { clicks: 0, impressions: 0, conversions: 0, revenue: 0 }),
+      items,
+    });
+  };
 
   private mutate(id: string, status: string) {
     const it = this.review.find((r) => r.id === id);

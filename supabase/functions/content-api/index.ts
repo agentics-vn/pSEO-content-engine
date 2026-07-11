@@ -5,7 +5,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
-import { makeContentApiHandler, type ContentApiDeps, type PublishedRow } from './lib.ts';
+import { makeContentApiHandler, type ContentApiDeps, type MetricsRow, type PublishedRow } from './lib.ts';
 
 const supabase = createClient(
   Deno.env.get('SUPABASE_URL') ?? '',
@@ -36,6 +36,23 @@ const deps: ContentApiDeps = {
     const { data, error } = await q.order('item_key');
     if (error) throw error;
     return (data ?? []) as PublishedRow[];
+  },
+  async upsertMetrics(siteId, source, rows: MetricsRow[]) {
+    const { data, error } = await supabase.from('page_metrics')
+      .upsert(rows.map((r) => ({
+        site_id: siteId,
+        source,
+        item_key: r.item_key,
+        date: r.date,
+        clicks: r.clicks ?? null,
+        impressions: r.impressions ?? null,
+        position: r.position ?? null,
+        conversions: r.conversions ?? null,
+        revenue: r.revenue ?? null,
+      })), { onConflict: 'site_id,item_key,date,source' })
+      .select('id');
+    if (error) throw error;
+    return data?.length ?? 0;
   },
   async registerWebhook(siteId, url) {
     const { data, error } = await supabase.from('site_webhooks')

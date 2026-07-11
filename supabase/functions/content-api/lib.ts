@@ -21,6 +21,16 @@ export interface PublishedRow {
   updated_at: string;
 }
 
+export interface MetricsRow {
+  item_key: string;
+  date: string;          // YYYY-MM-DD
+  clicks?: number;
+  impressions?: number;
+  position?: number;
+  conversions?: number;
+  revenue?: number;
+}
+
 export interface ContentApiDeps {
   getSiteBySlug(slug: string): Promise<{ id: string; slug: string } | null>;
   /** Unrevoked key rows for a site, matched by key_hash. */
@@ -31,6 +41,27 @@ export interface ContentApiDeps {
     sinceUpdatedAt?: string;
   }): Promise<PublishedRow[]>;
   registerWebhook(siteId: string, url: string): Promise<{ id: string }>;
+  /** Upsert on (site_id, item_key, date, source); returns rows written. */
+  upsertMetrics(siteId: string, source: 'gsc' | 'analytics', rows: MetricsRow[]): Promise<number>;
+}
+
+const MAX_METRIC_ROWS = 5000;
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const SLUG_RE = /^[a-z0-9][a-z0-9-]*$/;
+
+function validateMetricsRow(r: MetricsRow): string | null {
+  if (!r.item_key || !SLUG_RE.test(r.item_key)) return `bad item_key ${JSON.stringify(r.item_key)}`;
+  if (!r.date || !DATE_RE.test(r.date)) return `bad date for ${r.item_key}`;
+  for (const f of ['clicks', 'impressions', 'position', 'conversions', 'revenue'] as const) {
+    const v = r[f];
+    if (v !== undefined && (typeof v !== 'number' || !Number.isFinite(v) || v < 0)) {
+      return `bad ${f} for ${r.item_key}`;
+    }
+  }
+  if (r.clicks === undefined && r.impressions === undefined && r.conversions === undefined && r.revenue === undefined) {
+    return `row for ${r.item_key} carries no metrics`;
+  }
+  return null;
 }
 
 function json(body: unknown, status = 200): Response {
@@ -72,7 +103,7 @@ export function makeContentApiHandler(deps: ContentApiDeps) {
   return async function handle(req: Request): Promise<Response> {
     const url = new URL(req.url);
     const path = url.pathname.replace(/^.*?\/content-api/, '');
-    const m = path.match(/^\/v1\/sites\/([a-z0-9-]+)\/(published|webhooks)$/);
+    const m = path.match(/^\/v1\/sites\/([a-z0-9-]+)\/(published|webhooks|metrics)$/);
     if (!m) return json({ error: 'not found' }, 404);
     const [, slug, resource] = m;
 
@@ -119,6 +150,33 @@ export function makeContentApiHandler(deps: ContentApiDeps) {
       }
       const hook = await deps.registerWebhook(site.id, body.url);
       return json({ ok: true, webhook_id: hook.id }, 201);
+    }
+
+    // The performance loop's write path: the SITE (which holds the GSC and
+    // analytics credentials) posts per-page rows; the engine never talks to
+    // Google or the site's analytics itself.
+    if (resource === 'metrics' && req.method === 'POST') {
+      let body: { source?: string; rows?: MetricsRow[] };
+      try {
+        body = await req.json();
+      } catch {
+        return json({ error: 'invalid JSON body' }, 400);
+      }
+      if (body.source !== 'gsc' && body.source !== 'analytics') {
+        return json({ error: 'source must be "gsc" or "analytics"' }, 400);
+      }
+      if (!Array.isArray(body.rows) || body.rows.length === 0) {
+        return json({ error: 'rows[] required' }, 400);
+      }
+      if (body.rows.length > MAX_METRIC_ROWS) {
+        return json({ error: `max ${MAX_METRIC_ROWS} rows per call — chunk the upload` }, 413);
+      }
+      for (const r of body.rows) {
+        const problem = validateMetricsRow(r);
+        if (problem) return json({ error: problem }, 400);
+      }
+      const written = await deps.upsertMetrics(site.id, body.source, body.rows);
+      return json({ ok: true, written }, 200);
     }
 
     return json({ error: 'method not allowed' }, 405);

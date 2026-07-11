@@ -12,6 +12,7 @@ import { buildComboInput } from '../_shared/inputs.ts';
 
 interface World {
   deps: AdminDeps;
+  metrics: Array<{ item_key: string; clicks: number; impressions: number; avg_position: number | null; conversions: number; revenue: number }>;
   items: Map<string, AdminItemRow & { input_data: unknown; data_hash: string }>;
   jobs: Map<string, { id: string; site_id: string; template_id: string; status: string; mode: string; review_sample_pct: number }>;
   templates: Map<string, { id: string; site_id: string; key: string; version: number; guards: Record<string, unknown> }>;
@@ -27,6 +28,7 @@ function makeWorld(role: string = 'reviewer'): World {
   const templates: World['templates'] = new Map();
   const webhookCalls: World['webhookCalls'] = [];
   const generateCalls: string[] = [];
+  const metrics: World['metrics'] = [];
 
   templates.set('tpl-1', {
     id: 'tpl-1', site_id: 'site-1', key: 'combo-so-chu-dao-su-menh', version: 1,
@@ -131,6 +133,17 @@ function makeWorld(role: string = 'reviewer'): World {
       return Promise.resolve({ ok: true, status: 'generated' });
     },
 
+    getMetricsSummary: () => Promise.resolve(metrics),
+    getItemKeysForTemplate: (siteId, templateKey) =>
+      Promise.resolve(new Set([...items.values()]
+        .filter((i) => i.site_id === siteId && i.template_key === templateKey)
+        .map((i) => i.item_key))),
+    getRecentItemOutcomes: (siteId, templateKey, limit) =>
+      Promise.resolve([...items.values()]
+        .filter((i) => i.site_id === siteId && i.template_key === templateKey && i.status !== 'pending')
+        .slice(0, limit)
+        .map((i) => ({ status: i.status, validation: i.validation }))),
+
     listJobs: (siteId, limit) =>
       Promise.resolve([...jobs.values()].filter((j) => j.site_id === siteId).slice(0, limit) as unknown as Array<Record<string, unknown>>),
     getStats: (siteId) => {
@@ -153,7 +166,7 @@ function makeWorld(role: string = 'reviewer'): World {
     now: () => Date.now(),
   };
 
-  return { deps, items, jobs, templates, webhookCalls, generateCalls };
+  return { deps, items, jobs, templates, webhookCalls, generateCalls, metrics };
 }
 
 const call = (deps: AdminDeps, method: string, path: string, body?: unknown) =>
@@ -405,6 +418,55 @@ Deno.test('re-running a drained job is idempotent: cached generates, no new pend
     item_keys: ['so-chu-dao-2-su-menh-2', 'so-chu-dao-3-su-menh-3'],
   });
   assertEquals((await recreate.json()).inserted, 0);
+});
+
+// ── Adaptive sampling ────────────────────────────────────────────────────────
+
+import { computeAutoSamplePct } from '../prose-admin/lib.ts';
+
+Deno.test('computeAutoSamplePct: golden phase → 100, clean history → 5, shaky → 25', () => {
+  const clean = { status: 'generated', validation: { gates: [] } };
+  const failed = { status: 'failed_validation', validation: { gates: [] } };
+  assertEquals(computeAutoSamplePct([clean, clean]).pct, 100); // < 15 items
+  assertEquals(computeAutoSamplePct(Array(100).fill(clean)).pct, 5); // 100%
+  assertEquals(computeAutoSamplePct([...Array(96).fill(clean), ...Array(4).fill(failed)]).pct, 10); // 96%
+  assertEquals(computeAutoSamplePct([...Array(85).fill(clean), ...Array(15).fill(failed)]).pct, 25); // 85%
+});
+
+Deno.test('POST /jobs without review_sample_pct gets an adaptive value; explicit wins', async () => {
+  const w = makeWorld();
+  // Fresh template → golden phase → 100.
+  const auto = await call(w.deps, 'POST', '/jobs', {
+    template_key: 'combo-so-chu-dao-su-menh', item_keys: ['so-chu-dao-6-su-menh-6'],
+  });
+  const autoBody = await auto.json();
+  assertEquals(autoBody.review_sample_pct, 100);
+  assert(autoBody.sample_basis.includes('golden phase'));
+
+  const explicit = await call(w.deps, 'POST', '/jobs', {
+    template_key: 'combo-so-chu-dao-su-menh', item_keys: ['so-chu-dao-6-su-menh-7'],
+    review_sample_pct: 40,
+  });
+  assertEquals((await explicit.json()).review_sample_pct, 40);
+});
+
+// ── Performance metrics ──────────────────────────────────────────────────────
+
+Deno.test('GET /metrics aggregates totals, sorts by clicks, filters by template', async () => {
+  const w = makeWorld();
+  await seedItem(w, { status: 'published', item_key: 'so-chu-dao-7-su-menh-3' });
+  w.metrics.push(
+    { item_key: 'so-chu-dao-7-su-menh-3', clicks: 120, impressions: 2400, avg_position: 6.2, conversions: 4, revenue: 1_960_000 },
+    { item_key: 'khong-thuoc-template-nao', clicks: 50, impressions: 900, avg_position: 9.1, conversions: 0, revenue: 0 },
+  );
+  const all = await (await call(w.deps, 'GET', '/metrics?window=28')).json();
+  assertEquals(all.totals.clicks, 170);
+  assertEquals(all.items[0].item_key, 'so-chu-dao-7-su-menh-3');
+  assertEquals(all.items[0].ctr, 120 / 2400);
+
+  const filtered = await (await call(w.deps, 'GET', '/metrics?template=combo-so-chu-dao-su-menh')).json();
+  assertEquals(filtered.items.length, 1);
+  assertEquals(filtered.totals.revenue, 1_960_000);
 });
 
 // ── Review queue ─────────────────────────────────────────────────────────────
