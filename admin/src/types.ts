@@ -60,7 +60,7 @@ export interface MetricsSummary {
   items: MetricItem[]; // sorted by clicks desc
 }
 
-/** The operator surface the UI needs — backed by prose-admin or demo data. */
+/** The operator surface the UI needs — backed by prose-admin (RemoteSource). */
 export interface DataSource {
   load(): Promise<DashboardData>;
   metrics(): Promise<MetricsSummary | null>;

@@ -353,5 +353,3 @@ input, select { font: inherit; color: inherit; }
   background: var(--card-soft); padding: 11px 14px; outline: none;
 }
 .login .btn-dark { width: 100%; text-align: center; }
-.login .demo { text-align: center; font-weight: 700; color: var(--ink-2); padding: 6px; }
-.login .demo b { color: var(--ink); border-bottom: 2px solid var(--yellow); }

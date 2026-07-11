@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { DashboardData, DataSource, MetricsSummary, ReviewItem, JobRow } from './types';
-import { DemoSource, RemoteSource, savedConfig } from './api';
+import { RemoteSource, savedConfig } from './api';
 import {
   IconArchive, IconBell, IconCalendar, IconChevron, IconDoc, IconDots, IconFlag,
   IconGear, IconHome, IconLogout, IconPencil, IconPlus, IconSearch, IconSpark,
@@ -70,7 +70,7 @@ function Login({ onReady }: { onReady: (s: DataSource) => void }) {
       <div className="login">
         <div className="brand"><IconSpark /><span style={{ fontSize: 16, fontWeight: 800 }}>pSEO.engine</span></div>
         <div className="card">
-          <p className="hint">Sign in with your engine admin account (site_admins membership), or explore the demo world.</p>
+          <p className="hint">Sign in with your engine admin account (site_admins membership).</p>
           <div><label>Supabase URL</label><input value={f.supabaseUrl} onChange={set('supabaseUrl')} placeholder="https://xxxx.supabase.co" /></div>
           <div><label>Supabase anon key</label><input value={f.supabaseAnonKey} onChange={set('supabaseAnonKey')} placeholder="eyJ…" /></div>
           <div><label>prose-admin URL</label><input value={f.adminApiUrl} onChange={set('adminApiUrl')} placeholder="https://xxxx.supabase.co/functions/v1/prose-admin" /></div>
@@ -79,7 +79,6 @@ function Login({ onReady }: { onReady: (s: DataSource) => void }) {
           <div><label>Password</label><input type="password" value={f.password} onChange={set('password')} /></div>
           {err && <p className="hint" style={{ color: 'var(--coral)' }}>{err}</p>}
           <button className="btn-dark" disabled={busy} onClick={signIn}>{busy ? 'Signing in…' : 'Sign in'}</button>
-          <button className="demo" onClick={() => onReady(new DemoSource())}>Explore the <b>demo world</b> →</button>
         </div>
       </div>
     </div>
