@@ -55,26 +55,44 @@ export function linkingNumber(lifePath: CoreNumber, destiny: CoreNumber): number
 export type Harmony = 'cộng hưởng' | 'bổ sung' | 'thử thách';
 
 /**
- * Deterministic relationship between two core numbers, based on numerology
- * "mặt phẳng" (planes) grouping. Simplified demo heuristic — the production
- * engine replaces this with a vetted compatibility matrix passed through the
- * human-review gate, but the interface (and the compile-time consistency
- * check) stays the same.
+ * Deterministic relationship between two core numbers, from the classic
+ * Pythagorean compatibility chart (natural-match / compatible / challenge),
+ * replacing the Phase-0 planes demo heuristic. Same signature and the same
+ * compile-time consistency check downstream — only the read changed.
+ *
+ * - 'cộng hưởng' (natural match): the three natural-match triads
+ *   {1,5,7} (mind), {2,4,8} (business/practical), {3,6,9} (creative/emotional).
+ * - 'bổ sung' (compatible): the chart's "compatible" pairs, symmetric.
+ * - 'thử thách' (challenge): everything else.
+ *
+ * Master numbers read via their base digit (11→2, 22→4, 33→6), matching how
+ * linkingNumber treats them; the master quality is carried by NUMBER_FACTS,
+ * not by this pairwise read.
  */
-const PLANE: Record<number, 'trí tuệ' | 'thực tế' | 'cảm xúc'> = {
-  1: 'trí tuệ', 5: 'trí tuệ', 7: 'trí tuệ',
-  2: 'thực tế', 4: 'thực tế', 8: 'thực tế',
-  3: 'cảm xúc', 6: 'cảm xúc', 9: 'cảm xúc',
+const NATURAL_TRIAD: Record<number, number> = {
+  1: 1, 5: 1, 7: 1,
+  2: 2, 4: 2, 8: 2,
+  3: 3, 6: 3, 9: 3,
 };
 
+// Symmetric "compatible" pairs; every listed pair is mirrored in the check.
+const COMPATIBLE: ReadonlyArray<readonly [number, number]> = [
+  [1, 2], [1, 3], [1, 9],
+  [2, 3], [2, 6], [2, 9],
+  [3, 5],
+  [4, 6], [4, 7],
+  [5, 9],
+  [6, 8],
+];
+
 export function comboHarmony(a: CoreNumber, b: CoreNumber): Harmony {
-  const pa = PLANE[reduceToDigit(a)];
-  const pb = PLANE[reduceToDigit(b)];
-  if (pa === pb) return 'cộng hưởng';
-  // Trí tuệ (chiều sâu) + Cảm xúc (biểu đạt) bù trừ cho nhau.
-  const complementary =
-    (pa === 'trí tuệ' && pb === 'cảm xúc') || (pa === 'cảm xúc' && pb === 'trí tuệ');
-  return complementary ? 'bổ sung' : 'thử thách';
+  const da = reduceToDigit(a);
+  const db = reduceToDigit(b);
+  if (NATURAL_TRIAD[da] === NATURAL_TRIAD[db]) return 'cộng hưởng';
+  if (COMPATIBLE.some(([x, y]) => (x === da && y === db) || (x === db && y === da))) {
+    return 'bổ sung';
+  }
+  return 'thử thách';
 }
 
 /** Canonical slug for a life-path × destiny combo page. */
