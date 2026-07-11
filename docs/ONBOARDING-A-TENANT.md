@@ -122,3 +122,26 @@ Optionally register a webhook so publishes trigger their CI rebuild.
 **What the engine never does for a tenant:** page building, deploys, sitemaps,
 GSC/IndexNow submission, analytics. Those live in the client's stack (§9) —
 budget them in the engagement.
+
+## Phase B storage model — where articles live (one answer)
+
+**The engine's Supabase is the single system of record for every tenant's
+articles.** `prose_items`/`prose_published` are tenant-generic (`site_id`
+scope + JSONB `output`), so a new project is new ROWS, never a new table or
+schema. Do not create SEO-content tables in any project's database.
+
+Per-tenant, the only site-side artifact is the **pulled snapshot**
+(`*.generated.json`) written at build time — a cache, not a store; the engine
+can regenerate it entirely. This also isolates availability: engine downtime
+can only fail a *build*, never production traffic, because the static site
+serves the last good snapshot.
+
+The one legitimate exception: an app that renders content **at runtime**
+(SSR, in-app feeds, its own search over articles). Then its backend may
+mirror published rows into its own DB via `GET /published` + the webhook —
+still over HTTP with its site key, still a disposable replica of the engine's
+record. Architecture §8's "persists into its own database" describes this
+optional pattern only; it is not part of the standard static-tenant flow.
+
+Never grant a project direct access to the engine DB (keys, connection
+strings, or PostgREST) — the API + site-scoped key is the entire contract.
