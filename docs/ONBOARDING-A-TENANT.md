@@ -1,5 +1,41 @@
 # Onboarding a new client (tenant) — zero engine code
 
+## The recommended flow: strategy lives in the SITE repo
+
+Seat 1 works best where the pages will actually render — run Claude Code in
+the client's site repo (sochudao, ngaylanhthangtot, …), where the design
+system, existing pages, and real GSC data are at hand:
+
+```
+A. SITE REPO (Claude Code + human strategist)
+   keyword research → axis → hub & spoke → output_schema designed AGAINST
+   real components → demo pages rendered from 2–3 hand-written sample
+   `output` rows → template + work-list authored
+        │  hand-off = one folder: seeds/<client>/
+        │    site.json · template.<key>.json · worklist.golden.json · ROLLOUT.md
+        ▼
+B. ENGINE REPO (drop the folder — three commands)
+   deno run --allow-read --config supabase/functions/deno.json \
+     scripts/validate-seed.ts seeds/<client>        # same fill/guard code the
+                                                    # engine runs — must pass
+   deno run … scripts/load-seed.ts seeds/<client>   # site + template + key
+   POST /jobs with worklist.golden.json             # (or the admin UI)
+   → generate → review → approve → publish
+        │  publish webhook → site CI
+        ▼
+C. SITE REPO (already integrated — the demo pages became the components)
+   pull-and-throw script re-pulls → build renders published pages
+```
+
+The critical trick in phase A: **write the 2–3 demo pages against
+engine-shaped data** (a hand-authored `output` row matching the schema, in a
+`*.generated.json` file). That proves the schema is renderable before a
+single token is spent, and it means Seat 2 barely exists as a separate step —
+by the time the engine publishes, the components and pull script are already
+merged. `seeds/_examples/giavang24h/` is a complete reference hand-off.
+
+---
+
 The engine is multi-tenant by construction: every row is scoped by `site_id`,
 the item cache key includes the tenant, API keys are site-scoped, and admin
 logins see one site at a time. Onboarding a client is **data entry, not

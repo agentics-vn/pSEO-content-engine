@@ -1,0 +1,95 @@
+{
+  "_fictional": "Golden-set job body — POST this to prose-admin /jobs (or import in the admin UI). Prices are demo values; in production the client's backend regenerates this file daily from its price API, and changed facts re-hash into new generations automatically.",
+  "template_key": "gia-vang-tinh",
+  "review_sample_pct": 100,
+  "items": [
+    {
+      "item_key": "gia-vang-sjc-ha-noi",
+      "input_data": {
+        "city": "Hà Nội", "region": "miền Bắc", "metal": "sjc", "metal_name": "vàng miếng SJC",
+        "price_buy": 8450000, "price_sell": 8520000,
+        "price_buy_fmt": "8.450.000", "price_sell_fmt": "8.520.000", "spread_fmt": "70.000",
+        "delta_24h_fmt": "+150.000", "trend_word": "tăng nhẹ", "updated_date": "11/07/2026",
+        "hub": "/gia-vang/sjc/",
+        "siblings": ["gia-vang-sjc-hai-phong", "gia-vang-sjc-bac-ninh", "gia-vang-sjc-hung-yen"]
+      }
+    },
+    {
+      "item_key": "gia-vang-sjc-tp-ho-chi-minh",
+      "input_data": {
+        "city": "TP. Hồ Chí Minh", "region": "miền Nam", "metal": "sjc", "metal_name": "vàng miếng SJC",
+        "price_buy": 8460000, "price_sell": 8525000,
+        "price_buy_fmt": "8.460.000", "price_sell_fmt": "8.525.000", "spread_fmt": "65.000",
+        "delta_24h_fmt": "+140.000", "trend_word": "tăng nhẹ", "updated_date": "11/07/2026",
+        "hub": "/gia-vang/sjc/",
+        "siblings": ["gia-vang-sjc-binh-duong", "gia-vang-sjc-dong-nai", "gia-vang-sjc-can-tho"]
+      }
+    },
+    {
+      "item_key": "gia-vang-sjc-da-nang",
+      "input_data": {
+        "city": "Đà Nẵng", "region": "miền Trung", "metal": "sjc", "metal_name": "vàng miếng SJC",
+        "price_buy": 8430000, "price_sell": 8510000,
+        "price_buy_fmt": "8.430.000", "price_sell_fmt": "8.510.000", "spread_fmt": "80.000",
+        "delta_24h_fmt": "-20.000", "trend_word": "giảm nhẹ", "updated_date": "11/07/2026",
+        "hub": "/gia-vang/sjc/",
+        "siblings": ["gia-vang-sjc-hue", "gia-vang-sjc-quang-nam", "gia-vang-sjc-quang-ngai"]
+      }
+    },
+    {
+      "item_key": "gia-vang-sjc-can-tho",
+      "input_data": {
+        "city": "Cần Thơ", "region": "miền Tây", "metal": "sjc", "metal_name": "vàng miếng SJC",
+        "price_buy": 8440000, "price_sell": 8515000,
+        "price_buy_fmt": "8.440.000", "price_sell_fmt": "8.515.000", "spread_fmt": "75.000",
+        "delta_24h_fmt": "0", "trend_word": "đi ngang", "updated_date": "11/07/2026",
+        "hub": "/gia-vang/sjc/",
+        "siblings": ["gia-vang-sjc-tp-ho-chi-minh", "gia-vang-sjc-an-giang", "gia-vang-sjc-kien-giang"]
+      }
+    },
+    {
+      "item_key": "gia-vang-sjc-hai-phong",
+      "input_data": {
+        "city": "Hải Phòng", "region": "miền Bắc", "metal": "sjc", "metal_name": "vàng miếng SJC",
+        "price_buy": 8448000, "price_sell": 8519000,
+        "price_buy_fmt": "8.448.000", "price_sell_fmt": "8.519.000", "spread_fmt": "71.000",
+        "delta_24h_fmt": "+150.000", "trend_word": "tăng nhẹ", "updated_date": "11/07/2026",
+        "hub": "/gia-vang/sjc/",
+        "siblings": ["gia-vang-sjc-ha-noi", "gia-vang-sjc-quang-ninh", "gia-vang-sjc-thai-binh"]
+      }
+    },
+    {
+      "item_key": "gia-vang-nhan-ha-noi",
+      "input_data": {
+        "city": "Hà Nội", "region": "miền Bắc", "metal": "nhan", "metal_name": "vàng nhẫn 9999",
+        "price_buy": 7620000, "price_sell": 7690000,
+        "price_buy_fmt": "7.620.000", "price_sell_fmt": "7.690.000", "spread_fmt": "70.000",
+        "delta_24h_fmt": "+90.000", "trend_word": "tăng nhẹ", "updated_date": "11/07/2026",
+        "hub": "/gia-vang/nhan/",
+        "siblings": ["gia-vang-nhan-hai-phong", "gia-vang-nhan-bac-ninh", "gia-vang-nhan-nam-dinh"]
+      }
+    },
+    {
+      "item_key": "gia-vang-nhan-tp-ho-chi-minh",
+      "input_data": {
+        "city": "TP. Hồ Chí Minh", "region": "miền Nam", "metal": "nhan", "metal_name": "vàng nhẫn 9999",
+        "price_buy": 7630000, "price_sell": 7695000,
+        "price_buy_fmt": "7.630.000", "price_sell_fmt": "7.695.000", "spread_fmt": "65.000",
+        "delta_24h_fmt": "+85.000", "trend_word": "tăng nhẹ", "updated_date": "11/07/2026",
+        "hub": "/gia-vang/nhan/",
+        "siblings": ["gia-vang-nhan-binh-duong", "gia-vang-nhan-dong-nai", "gia-vang-nhan-vung-tau"]
+      }
+    },
+    {
+      "item_key": "gia-vang-nhan-hue",
+      "input_data": {
+        "city": "Huế", "region": "miền Trung", "metal": "nhan", "metal_name": "vàng nhẫn 9999",
+        "price_buy": 7605000, "price_sell": 7685000,
+        "price_buy_fmt": "7.605.000", "price_sell_fmt": "7.685.000", "spread_fmt": "80.000",
+        "delta_24h_fmt": "-15.000", "trend_word": "giảm nhẹ", "updated_date": "11/07/2026",
+        "hub": "/gia-vang/nhan/",
+        "siblings": ["gia-vang-nhan-da-nang", "gia-vang-nhan-quang-tri", "gia-vang-nhan-quang-binh"]
+      }
+    }
+  ]
+}
