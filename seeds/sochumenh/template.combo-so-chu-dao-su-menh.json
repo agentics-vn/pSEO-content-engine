@@ -2,10 +2,10 @@
   "key": "combo-so-chu-dao-su-menh",
   "version": 1,
   "name": "Tổ hợp Số chủ đạo × Số sứ mệnh",
-  "model": "claude-haiku-4",
+  "model": "claude-sonnet-5",
   "temperature": 0.7,
   "max_tokens": 2600,
-  "_model_note": "Golden set (~15 items) generated on a Sonnet-class model first, then distilled: promote approved outputs into few_shots and switch this field to Haiku for the remaining batch.",
+  "_model_note": "Golden set (~15 items) generated on claude-sonnet-5 first, then distilled: promote approved outputs into few_shots and switch this field to claude-haiku-4-5 for the remaining batch. NOTE: temperature is ignored for model families that reject sampling params (sonnet-5/opus-4.7+/fable); it applies on haiku-4-5.",
 
   "output_schema": {
     "type": "object",
@@ -23,6 +23,8 @@
       "advice":          { "type": "string" },
       "faqs": {
         "type": "array",
+        "minItems": 4,
+        "maxItems": 4,
         "items": {
           "type": "object",
           "additionalProperties": false,
@@ -59,7 +61,7 @@
     },
     "numeric_consistency": {
       "severity": "fail",
-      "computed": ["lifePath", "destiny", "linking", "maturity", "lpReduced", "dtReduced"]
+      "computed": ["lifePath", "destiny", "linking", "maturity", "lpReduced", "dtReduced", "maturitySum"]
     },
     "entity_consistency": {
       "severity": "flag",
@@ -71,6 +73,8 @@
     },
     "faq_shape": {
       "severity": "fail",
+      "count": 4,
+      "answers_must_contain": ["{linking}", "{maturity}"],
       "note": "exactly 4 faqs; one answer must contain {linking}; one must contain {maturity}"
     },
     "phrase_frequency": { "severity": "flag", "scope": "batch" },

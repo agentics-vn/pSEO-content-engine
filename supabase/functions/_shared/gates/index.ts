@@ -104,11 +104,17 @@ export function gatePhraseFrequency(_ctx: GateContext): GateResult {
 const PER_ITEM = [gateUnicode, gateLength, gateRequiredMentions, gateBannedPhrases, gateNumericConsistency];
 
 /** Run all configured per-item gates. Schema/faq_shape are checked upstream by
- *  strict tool use + a shape assert; those results should be merged in. */
+ *  strict tool use + a shape assert; those results should be merged in.
+ *  A gate's default severity can be overridden per template via
+ *  guards[gate].severity — severity is tenant data, not engine code. */
 export function runItemGates(ctx: GateContext): GateResult[] {
   return PER_ITEM
     .map(fn => fn(ctx))
-    .filter(r => ctx.guards[r.gate] !== undefined); // only run gates present in guards
+    .filter(r => ctx.guards[r.gate] !== undefined) // only run gates present in guards
+    .map(r => {
+      const configured = ctx.guards[r.gate]?.severity;
+      return configured === 'fail' || configured === 'flag' ? { ...r, severity: configured as Severity } : r;
+    });
 }
 
 export function hasFailingGate(results: GateResult[]): boolean {
