@@ -83,22 +83,153 @@ export function gateNumericConsistency(ctx: GateContext): GateResult {
 }
 
 // ── Batch-scope gates (run after a batch, before publish) ────────────────────
+//
+// The doorway-cluster defense: a combo axis repeats the same number across a
+// whole row, so near-duplication is the structural risk. Both gates are pure
+// text statistics — no second LLM call.
 
-/** n-gram TF-IDF cosine between all pairs — near-duplicate catcher, no LLM. */
-export function gateSimilarity(ctx: GateContext): GateResult {
-  // TODO: implement TF-IDF over character 3-grams of the concatenated prose;
-  // flag any item whose max pairwise cosine > guards.similarity.max_pairwise.
-  const max = ctx.guards.similarity?.max_pairwise ?? 0.55;
-  return { gate: 'similarity', severity: 'flag', passed: true,
-           detail: `TODO: enforce max pairwise cosine ≤ ${max} across batch` };
+/** Every string in the item (nested fields, faq q/a) concatenated as prose. */
+export function proseOf(output: unknown): string {
+  const parts: string[] = [];
+  const walk = (v: unknown): void => {
+    if (typeof v === 'string') parts.push(v);
+    else if (Array.isArray(v)) v.forEach(walk);
+    else if (v !== null && typeof v === 'object') Object.values(v).forEach(walk);
+  };
+  walk(output);
+  return parts.join(' ');
 }
 
-/** Flag stamped openings reused across the batch. */
-export function gatePhraseFrequency(_ctx: GateContext): GateResult {
-  // TODO: tokenize each intro's first sentence; flag opening n-grams shared by
-  // more than N items (e.g. "Người mang số chủ đạo … và số sứ mệnh …").
-  return { gate: 'phrase_frequency', severity: 'flag', passed: true,
-           detail: 'TODO: flag reused opening n-grams across batch' };
+function charNgrams(text: string, n = 3): Map<string, number> {
+  const norm = text.toLowerCase().normalize('NFC').replace(/\s+/g, ' ').trim();
+  const counts = new Map<string, number>();
+  for (let i = 0; i + n <= norm.length; i++) {
+    const gram = norm.slice(i, i + n);
+    counts.set(gram, (counts.get(gram) ?? 0) + 1);
+  }
+  return counts;
+}
+
+/**
+ * Pairwise cosine over TF-IDF weighted character 3-grams. Returns the full
+ * N×N matrix (diagonal = 1). Parity target with the reference metric: a
+ * healthy 31-page batch measured avg pairwise ≈ 0.43, max ≈ 0.72.
+ */
+export function similarityMatrix(texts: string[]): number[][] {
+  const n = texts.length;
+  const tfs = texts.map(t => charNgrams(t));
+  const df = new Map<string, number>();
+  for (const tf of tfs) for (const gram of tf.keys()) df.set(gram, (df.get(gram) ?? 0) + 1);
+  const idf = (gram: string) => Math.log((n + 1) / ((df.get(gram) ?? 0) + 1)) + 1;
+
+  const vectors = tfs.map(tf => {
+    const v = new Map<string, number>();
+    let normSq = 0;
+    for (const [gram, count] of tf) {
+      const w = count * idf(gram);
+      v.set(gram, w);
+      normSq += w * w;
+    }
+    return { v, norm: Math.sqrt(normSq) };
+  });
+
+  const sim = Array.from({ length: n }, () => new Array<number>(n).fill(0));
+  for (let i = 0; i < n; i++) {
+    sim[i][i] = 1;
+    for (let j = i + 1; j < n; j++) {
+      const [small, large] = vectors[i].v.size <= vectors[j].v.size
+        ? [vectors[i], vectors[j]] : [vectors[j], vectors[i]];
+      let dot = 0;
+      for (const [gram, w] of small.v) {
+        const w2 = large.v.get(gram);
+        if (w2 !== undefined) dot += w * w2;
+      }
+      const denom = vectors[i].norm * vectors[j].norm;
+      sim[i][j] = sim[j][i] = denom === 0 ? 0 : dot / denom;
+    }
+  }
+  return sim;
+}
+
+/** First-sentence opening key used by the phrase_frequency gate. */
+function openingKey(intro: string, tokens = 6): string {
+  const firstSentence = intro.split(/(?<=[.!?…])\s/)[0] ?? intro;
+  return firstSentence.toLowerCase().normalize('NFC')
+    .replace(/[\d]+/g, '#')            // "số chủ đạo 7" and "… 4" stamp alike
+    .replace(/[^\p{L}#\s]/gu, '')
+    .split(/\s+/).filter(Boolean).slice(0, tokens).join(' ');
+}
+
+export interface BatchItem {
+  id: string;
+  output: Record<string, unknown>;
+}
+
+export interface BatchGateResult {
+  similarity: number | null;   // max pairwise cosine vs the rest of the batch
+  gates: GateResult[];
+}
+
+/**
+ * Run all batch-scope gates over a job's generated items. Called by
+ * prose-admin after the generate loop drains, before review/publish; results
+ * are merged into each item's validation + similarity columns.
+ */
+export function runBatchGates(
+  items: BatchItem[],
+  guards: Record<string, any>,
+): Map<string, BatchGateResult> {
+  const out = new Map<string, BatchGateResult>();
+  if (items.length === 0) return out;
+
+  const simCfg = guards.similarity;
+  const freqCfg = guards.phrase_frequency;
+  const maxPairwise: number = simCfg?.max_pairwise ?? 0.55;
+  const maxShared: number = freqCfg?.max_shared ?? 2;
+
+  const sim = simCfg !== undefined && items.length > 1
+    ? similarityMatrix(items.map(it => proseOf(it.output)))
+    : null;
+
+  const openings = new Map<string, number>();
+  if (freqCfg !== undefined) {
+    for (const it of items) {
+      const key = openingKey(String(it.output.intro ?? ''));
+      if (key) openings.set(key, (openings.get(key) ?? 0) + 1);
+    }
+  }
+
+  items.forEach((it, i) => {
+    const gates: GateResult[] = [];
+    let maxSim: number | null = null;
+
+    if (sim !== null) {
+      maxSim = Math.max(...sim[i].filter((_, j) => j !== i));
+      gates.push({
+        gate: 'similarity',
+        severity: (simCfg?.severity === 'fail' ? 'fail' : 'flag'),
+        passed: maxSim <= maxPairwise,
+        detail: maxSim > maxPairwise
+          ? `max pairwise cosine ${maxSim.toFixed(3)} > ${maxPairwise}` : undefined,
+      });
+    }
+
+    if (freqCfg !== undefined) {
+      const key = openingKey(String(it.output.intro ?? ''));
+      const shared = key ? (openings.get(key) ?? 0) : 0;
+      gates.push({
+        gate: 'phrase_frequency',
+        severity: (freqCfg?.severity === 'fail' ? 'fail' : 'flag'),
+        passed: shared <= maxShared,
+        detail: shared > maxShared
+          ? `opening "${key}" shared by ${shared} items (max ${maxShared})` : undefined,
+      });
+    }
+
+    out.set(it.id, { similarity: maxSim, gates });
+  });
+
+  return out;
 }
 
 const PER_ITEM = [gateUnicode, gateLength, gateRequiredMentions, gateBannedPhrases, gateNumericConsistency];
