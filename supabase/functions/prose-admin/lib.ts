@@ -15,6 +15,7 @@ import { enumerateComboGrid, comboSlug, isMaster, type CoreNumber } from '@pseo/
 import { buildComboInput } from '../_shared/inputs.ts';
 import { dataHash } from '../_shared/hash.ts';
 import { hasFailingGate, runBatchGates, type GateResult } from '../_shared/gates/index.ts';
+import { assembleItemGates } from '../prose-generate/lib.ts';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -69,7 +70,7 @@ function atLeast(role: string, needed: 'editor' | 'reviewer'): boolean {
 
 export interface ItemOutcome {
   status: string;
-  validation: { gates?: GateResult[] };
+  validation: { gates?: GateResult[]; batch_gates?: GateResult[] };
 }
 
 /**
@@ -86,7 +87,8 @@ export function computeAutoSamplePct(outcomes: ItemOutcome[]): { pct: number; ba
   }
   const failures = considered.filter((o) =>
     o.status === 'failed_validation' ||
-    (o.validation?.gates ?? []).some((g) => g.severity === 'fail' && !g.passed)).length;
+    [...(o.validation?.gates ?? []), ...(o.validation?.batch_gates ?? [])]
+      .some((g) => g.severity === 'fail' && !g.passed)).length;
   const rate = 1 - failures / considered.length;
   const pct = rate >= 0.99 ? 5 : rate >= 0.95 ? 10 : 25;
   return { pct, basis: `first-pass rate ${(rate * 100).toFixed(1)}% over last ${considered.length} items` };
@@ -100,6 +102,7 @@ export interface AdminItemRow {
   template_version: number;
   item_key: string;
   status: string;
+  input_data: Record<string, unknown>;
   output: Record<string, unknown> | null;
   edited_output: Record<string, unknown> | null;
   validation: {
@@ -117,7 +120,7 @@ export interface AdminDeps {
 
   getLatestTemplateVersion(siteId: string, key: string): Promise<number | null>;
   getTemplate(siteId: string, key: string, version: number): Promise<
-    | { id: string; key: string; version: number; guards: Record<string, unknown> }
+    | { id: string; key: string; version: number; guards: Record<string, unknown>; output_schema: Record<string, unknown> }
     | null
   >;
   insertTemplate(siteId: string, userId: string, row: TemplateInput & { version: number }): Promise<{ id: string; version: number }>;
@@ -132,6 +135,16 @@ export interface AdminDeps {
     site_id: string; job_id: string; template_key: string; template_version: number;
     item_key: string; data_hash: string; input_data: unknown; status: string;
   }>): Promise<number>;
+  /**
+   * Regenerate: reset EXISTING non-published rows for these item_keys (at this
+   * template_version) back to pending under the new job so the run loop
+   * re-generates them. Published rows are left untouched — refreshing live
+   * content requires a new template_version (immutable-version + cache-key
+   * design), so those keys are returned separately for the caller to surface.
+   */
+  resetItemsForRegenerate(
+    siteId: string, templateKey: string, version: number, itemKeys: string[], jobId: string,
+  ): Promise<{ reset: string[]; published: string[] }>;
 
   getJob(siteId: string, jobId: string): Promise<
     | { id: string; site_id: string; template_id: string; status: string; mode: string; review_sample_pct: number }
@@ -280,16 +293,31 @@ export function makeAdminHandler(deps: AdminDeps, opts: { runBudgetMs?: number }
           } else {
             return json({ error: 'items, item_keys, or enumerate required' }, 400);
           }
-          workList = itemKeys.map((item_key) => ({
-            item_key,
-            input_data: buildComboInput(item_key) as unknown as Record<string, unknown>,
-          }));
+          // buildComboInput throws on a key the built-in enumerator can't
+          // resolve — that's a client input error (400), not a server 500.
+          // For non-combo verticals, callers pass explicit `items` with
+          // input_data instead of `item_keys`.
+          try {
+            workList = itemKeys.map((item_key) => ({
+              item_key,
+              input_data: buildComboInput(item_key) as unknown as Record<string, unknown>,
+            }));
+          } catch (e) {
+            return json({ error: `item_keys not resolvable by the built-in input builder (use explicit \`items\` with input_data for this vertical): ${e instanceof Error ? e.message : e}` }, 400);
+          }
         }
 
-        // Filter out already-published keys (WP4: build-the-work-list step).
-        const published = await deps.getPublishedItemKeys(site.site_id, j.template_key);
-        workList = workList.filter((w) => !published.has(w.item_key));
-        if (workList.length === 0) return json({ error: 'work-list is empty after excluding published items' }, 400);
+        const mode = j.mode ?? 'generate';
+        // Generate: drop already-published keys (WP4 — don't re-generate live
+        // pages; new keys only). Regenerate: KEEP them — resetItemsForRegenerate
+        // below classifies existing rows (re-queue non-published; report
+        // published as needs_version_bump). Pre-filtering here would strip the
+        // very keys a regenerate job is meant to act on.
+        if (mode !== 'regenerate') {
+          const published = await deps.getPublishedItemKeys(site.site_id, j.template_key);
+          workList = workList.filter((w) => !published.has(w.item_key));
+          if (workList.length === 0) return json({ error: 'work-list is empty after excluding published items' }, 400);
+        }
 
         // Sampling: explicit value wins; otherwise adapt to the template's
         // recent first-pass gate history.
@@ -322,9 +350,29 @@ export function makeAdminHandler(deps: AdminDeps, opts: { runBudgetMs?: number }
           status: 'pending',
         })));
         const inserted = await deps.insertItems(rows);
+
+        // Regenerate: brand-new facts insert as fresh pending rows above; for
+        // item_keys that ALREADY exist at this version, reset the non-published
+        // ones to pending under this job (else they'd sit un-queued and the run
+        // loop would no-op — the whole point of a regenerate job). Published
+        // keys can't be redone in place; report them so the operator bumps the
+        // template_version instead.
+        let regenerated = 0;
+        let needsVersionBump: string[] = [];
+        if (mode === 'regenerate') {
+          const existing = workList.map((w) => w.item_key);
+          const r = await deps.resetItemsForRegenerate(
+            site.site_id, j.template_key, version, existing, job.id,
+          );
+          regenerated = r.reset.length;
+          needsVersionBump = r.published;
+        }
+
         return json({
           ok: true, job_id: job.id, item_count: workList.length,
-          inserted, deduped: workList.length - inserted,
+          inserted, regenerated,
+          deduped: workList.length - inserted - regenerated - needsVersionBump.length,
+          needs_version_bump: needsVersionBump,
           review_sample_pct: samplePct, sample_basis: sampleBasis,
         }, 201);
       }
@@ -343,7 +391,10 @@ export function makeAdminHandler(deps: AdminDeps, opts: { runBudgetMs?: number }
         // THIS invocation never re-attempts it and spins its budget away.
         const attempted = new Set<string>();
         while (deps.now() - started < runBudgetMs) {
-          const ids = (await deps.getPendingItemIds(job.id, 25)).filter((id) => !attempted.has(id)).slice(0, 5);
+          // Fetch a wide window so that already-attempted (failed-but-still-
+          // pending) items don't crowd out unattempted ones within an
+          // invocation. attempted resets next invocation regardless.
+          const ids = (await deps.getPendingItemIds(job.id, 500)).filter((id) => !attempted.has(id)).slice(0, 5);
           if (ids.length === 0) break;
           for (const id of ids) {
             if (deps.now() - started >= runBudgetMs) break;
@@ -390,7 +441,8 @@ export function makeAdminHandler(deps: AdminDeps, opts: { runBudgetMs?: number }
 
       // ── GET /metrics — the performance loop's read side ──────────────────
       if (req.method === 'GET' && path === '/metrics') {
-        const windowDays = Math.min(Math.max(Number(url.searchParams.get('window') ?? 28), 1), 180);
+        const rawWindow = Number(url.searchParams.get('window') ?? 28);
+        const windowDays = Number.isFinite(rawWindow) ? Math.min(Math.max(rawWindow, 1), 180) : 28;
         const since = new Date(Date.now() - windowDays * 86_400_000).toISOString().slice(0, 10);
         let rows = await deps.getMetricsSummary(site.site_id, since);
         const template = url.searchParams.get('template');
@@ -460,9 +512,23 @@ export function makeAdminHandler(deps: AdminDeps, opts: { runBudgetMs?: number }
             // Publishing is one-way (§5): a published item is never mutated.
             if (item.status === 'published') return json({ error: 'published items are immutable — bump template_version and republish' }, 409);
             const b = (await req.json()) as { edited_output?: Record<string, unknown> };
-            if (!b.edited_output) return json({ error: 'edited_output required' }, 400);
-            await deps.updateItem(itemId, { edited_output: b.edited_output, reviewer: userId });
-            return json({ ok: true });
+            if (!b.edited_output || typeof b.edited_output !== 'object') return json({ error: 'edited_output (object) required' }, 400);
+            // RE-GATE the edit — otherwise a reviewer could edit clean content to
+            // insert a banned phrase / bad length / unbacked number and it would
+            // publish against STALE (green) gate results, defeating ground rule 1.
+            // (§ audit) Per-item gates recompute here; batch gates persist as-is.
+            const patch: Record<string, unknown> = { edited_output: b.edited_output, reviewer: userId };
+            const tpl = await deps.getTemplate(site.site_id, item.template_key, item.template_version);
+            if (tpl) {
+              const gates = assembleItemGates(
+                b.edited_output,
+                { output_schema: tpl.output_schema, guards: tpl.guards },
+                item.input_data,
+              );
+              patch.validation = { ...(item.validation ?? {}), gates };
+            }
+            await deps.updateItem(itemId, patch);
+            return json({ ok: true, regated: !!tpl });
           }
           case 'publish': {
             if (item.status === 'published') return json({ ok: true, status: 'published', already: true });

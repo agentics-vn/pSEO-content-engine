@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { DashboardData, DataSource, MetricsSummary, ReviewItem, JobRow } from './types';
 import { DemoSource, RemoteSource, savedConfig } from './api';
 import {
   IconArchive, IconBell, IconCalendar, IconChevron, IconDoc, IconDots, IconFlag,
-  IconGauge, IconGear, IconHome, IconLogout, IconPencil, IconPlus, IconSearch, IconSpark,
+  IconGear, IconHome, IconLogout, IconPencil, IconPlus, IconSearch, IconSpark,
 } from './icons';
 
 // ── Small helpers ────────────────────────────────────────────────────────────
@@ -287,7 +287,7 @@ function CalendarCard({ jobs }: { jobs: JobRow[] }) {
 }
 
 function GaugeCard({ passRate }: { passRate: number }) {
-  const R = 62, C = 2 * Math.PI * R;
+  const R = 62;
   const arcSpan = 0.78; // 280° open arc, like the reference
   const frac = Math.min(passRate, 100) / 100;
   return (
@@ -366,7 +366,7 @@ function QueueCard({ review, jobs, onAct, onNewJob, onRun }: {
               <div className="face" aria-hidden>{/^so-chu-dao-(\d+)/.exec(it.item_key)?.[1] ?? '•'}</div>
               <div className="who" title={`${it.template_key} v${it.template_version} — ${it.item_key}`}>
                 <b>{prettyKey(it.item_key)}</b>
-                <span>template v{it.template_version}{it.similarity !== null ? ` · sim ${it.similarity.toFixed(2)}` : ''}</span>
+                <span><span className={`st st-${it.status}`}>{it.status}</span> · v{it.template_version}{it.similarity !== null ? ` · sim ${it.similarity.toFixed(2)}` : ''}</span>
               </div>
               <div className="gates">
                 {redFails.length > 0 && (
@@ -501,6 +501,3 @@ function NewJobDialog({ onClose, onCreate }: {
     </div>
   );
 }
-
-// react import for JSX namespace in icons — kept referenced
-void useMemo;

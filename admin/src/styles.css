@@ -252,6 +252,10 @@ input, select { font: inherit; color: inherit; }
 .row .who { flex: none; width: 196px; overflow: hidden; }
 .row .who b { font-size: 14px; display: block; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
 .row .who span { color: var(--ink-2); font-size: 12px; white-space: nowrap; display: block; text-overflow: ellipsis; overflow: hidden; }
+.st { font-weight: 700; text-transform: capitalize; }
+.st-flagged { color: var(--coral); }
+.st-approved { color: #2f8f5b; }
+.st-generated { color: var(--ink-2); }
 .row .gates { flex: 1; display: flex; align-items: center; gap: 12px; justify-content: flex-end; }
 .row .gates .count { color: var(--ink-2); font-size: 12.5px; white-space: nowrap; }
 .row .gates .count b { color: var(--ink); }

@@ -67,18 +67,28 @@ for (const site of config.sites) {
     continue;
   }
   try {
-    const gsc = await fetch(
-      `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(site.gsc_property)}/searchAnalytics/query`,
-      {
-        method: 'POST',
-        headers: { authorization: `Bearer ${access_token}`, 'content-type': 'application/json' },
-        body: JSON.stringify({ startDate: start, endDate: end, dimensions: ['page', 'date'], rowLimit: 25000 }),
-      },
-    );
-    if (!gsc.ok) throw new Error(`GSC ${gsc.status}: ${(await gsc.text()).slice(0, 200)}`);
-    const data = await gsc.json();
+    // Paginate: GSC caps a response at 25k rows. A cluster with >~893 pages
+    // over the 28-day window exceeds that per query, so walk startRow until a
+    // page returns fewer than the limit — otherwise rows past 25k are silently
+    // dropped and those pages never reach the engine.
+    const PAGE = 25000;
+    const gscRows = [];
+    for (let startRow = 0; ; startRow += PAGE) {
+      const gsc = await fetch(
+        `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(site.gsc_property)}/searchAnalytics/query`,
+        {
+          method: 'POST',
+          headers: { authorization: `Bearer ${access_token}`, 'content-type': 'application/json' },
+          body: JSON.stringify({ startDate: start, endDate: end, dimensions: ['page', 'date'], rowLimit: PAGE, startRow }),
+        },
+      );
+      if (!gsc.ok) throw new Error(`GSC ${gsc.status}: ${(await gsc.text()).slice(0, 200)}`);
+      const batch = (await gsc.json()).rows ?? [];
+      gscRows.push(...batch);
+      if (batch.length < PAGE) break;
+    }
 
-    const rows = (data.rows ?? []).flatMap((r) => {
+    const rows = gscRows.flatMap((r) => {
       const path = new URL(r.keys[0]).pathname;
       if (!path.startsWith(site.pages_prefix)) return [];
       const item_key = path.replace(/\/$/, '').split('/').pop();
@@ -96,7 +106,7 @@ for (const site of config.sites) {
       if (!res.ok) throw new Error(`engine ${res.status}: ${(await res.text()).slice(0, 200)}`);
       written += (await res.json()).written ?? 0;
     }
-    summary.push(`${label}: ${rows.length} rows (${written} written) from ${(data.rows ?? []).length} GSC pages·days`);
+    summary.push(`${label}: ${rows.length} rows (${written} written) from ${gscRows.length} GSC pages·days`);
   } catch (err) {
     summary.push(`${label}: FAILED — ${err instanceof Error ? err.message : err}`);
   }

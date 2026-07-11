@@ -10,7 +10,7 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
-const ITEM_COLS = 'id, site_id, job_id, template_key, template_version, item_key, status, output, edited_output, validation, similarity';
+const ITEM_COLS = 'id, site_id, job_id, template_key, template_version, item_key, status, input_data, output, edited_output, validation, similarity';
 
 const deps: AdminDeps = {
   async getUserId(jwt) {
@@ -39,7 +39,7 @@ const deps: AdminDeps = {
   },
   async getTemplate(siteId, key, version) {
     const { data, error } = await supabase.from('prose_templates')
-      .select('id, key, version, guards')
+      .select('id, key, version, guards, output_schema')
       .eq('site_id', siteId).eq('key', key).eq('version', version).maybeSingle();
     if (error) throw error;
     return data;
@@ -85,6 +85,24 @@ const deps: AdminDeps = {
       }).select('id');
     if (error) throw error;
     return data?.length ?? 0;
+  },
+  async resetItemsForRegenerate(siteId, templateKey, version, itemKeys, jobId) {
+    if (itemKeys.length === 0) return { reset: [], published: [] };
+    // Published rows at this version cannot be redone in place — that would
+    // un-publish live content. Identify them first, exclude, and report back.
+    const { data: pub, error: pErr } = await supabase.from('prose_items')
+      .select('item_key')
+      .eq('site_id', siteId).eq('template_key', templateKey).eq('template_version', version)
+      .in('item_key', itemKeys).eq('status', 'published');
+    if (pErr) throw pErr;
+    const published = (pub ?? []).map((r) => r.item_key as string);
+    const { data: reset, error: rErr } = await supabase.from('prose_items')
+      .update({ status: 'pending', job_id: jobId, updated_at: new Date().toISOString() })
+      .eq('site_id', siteId).eq('template_key', templateKey).eq('template_version', version)
+      .in('item_key', itemKeys).neq('status', 'published')
+      .select('item_key');
+    if (rErr) throw rErr;
+    return { reset: (reset ?? []).map((r) => r.item_key as string), published };
   },
 
   async getJob(siteId, jobId) {
@@ -230,9 +248,15 @@ const deps: AdminDeps = {
     const { data: tokens, error: tErr } = await supabase.from('prose_jobs')
       .select('tokens_in, tokens_out').eq('site_id', siteId);
     if (tErr) throw tErr;
+    // published_total = LIVE pages, from the dedup view — NOT the raw
+    // status='published' row count, which double-counts superseded versions
+    // (republishing v2 leaves v1's row at status='published' too).
+    const { count: liveCount, error: pErr } = await supabase.from('prose_published')
+      .select('item_key', { count: 'exact', head: true }).eq('site_id', siteId);
+    if (pErr) throw pErr;
     return {
       items_by_status: byStatus,
-      published_total: byStatus.published,
+      published_total: liveCount ?? 0,
       tokens_in: (tokens ?? []).reduce((s, j) => s + Number(j.tokens_in), 0),
       tokens_out: (tokens ?? []).reduce((s, j) => s + Number(j.tokens_out), 0),
     };

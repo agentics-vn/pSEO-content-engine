@@ -13,9 +13,9 @@ import { buildComboInput } from '../_shared/inputs.ts';
 interface World {
   deps: AdminDeps;
   metrics: Array<{ item_key: string; clicks: number; impressions: number; avg_position: number | null; conversions: number; revenue: number }>;
-  items: Map<string, AdminItemRow & { input_data: unknown; data_hash: string }>;
+  items: Map<string, AdminItemRow & { data_hash: string }>;
   jobs: Map<string, { id: string; site_id: string; template_id: string; status: string; mode: string; review_sample_pct: number }>;
-  templates: Map<string, { id: string; site_id: string; key: string; version: number; guards: Record<string, unknown> }>;
+  templates: Map<string, { id: string; site_id: string; key: string; version: number; guards: Record<string, unknown>; output_schema: Record<string, unknown> }>;
   webhookCalls: Array<{ url: string; payload: unknown }>;
   generateCalls: string[];
 }
@@ -32,7 +32,9 @@ function makeWorld(role: string = 'reviewer'): World {
 
   templates.set('tpl-1', {
     id: 'tpl-1', site_id: 'site-1', key: 'combo-so-chu-dao-su-menh', version: 1,
+    output_schema: { type: 'object' },
     guards: {
+      banned_phrases: { severity: 'fail', list: ['cấm'] },
       similarity: { severity: 'flag', max_pairwise: 0.55 },
       phrase_frequency: { severity: 'flag', max_shared: 2 },
     },
@@ -51,7 +53,7 @@ function makeWorld(role: string = 'reviewer'): World {
       Promise.resolve([...templates.values()].find((t) => t.site_id === siteId && t.key === key && t.version === version) ?? null),
     insertTemplate: (siteId, _userId, row) => {
       const id = uid();
-      templates.set(id, { id, site_id: siteId, key: row.key, version: row.version, guards: row.guards ?? {} });
+      templates.set(id, { id, site_id: siteId, key: row.key, version: row.version, guards: row.guards ?? {}, output_schema: row.output_schema ?? { type: 'object' } });
       return Promise.resolve({ id, version: row.version });
     },
 
@@ -76,11 +78,24 @@ function makeWorld(role: string = 'reviewer'): World {
           id, site_id: r.site_id, job_id: r.job_id, template_key: r.template_key,
           template_version: r.template_version, item_key: r.item_key, status: r.status,
           output: null, edited_output: null, validation: {}, similarity: null,
-          input_data: r.input_data, data_hash: r.data_hash,
+          input_data: r.input_data as Record<string, unknown>, data_hash: r.data_hash,
         });
         inserted++;
       }
       return Promise.resolve(inserted);
+    },
+    resetItemsForRegenerate: (siteId, templateKey, version, itemKeys, jobId) => {
+      const reset: string[] = [];
+      const published: string[] = [];
+      for (const it of items.values()) {
+        if (it.site_id !== siteId || it.template_key !== templateKey || it.template_version !== version) continue;
+        if (!itemKeys.includes(it.item_key)) continue;
+        if (it.status === 'published') { published.push(it.item_key); continue; }
+        it.status = 'pending';
+        it.job_id = jobId;
+        reset.push(it.item_key);
+      }
+      return Promise.resolve({ reset, published });
     },
 
     getJob: (siteId, jobId) => {
@@ -184,7 +199,7 @@ async function seedItem(w: World, over: Partial<AdminItemRow> = {}): Promise<str
     template_version: 1, item_key: 'so-chu-dao-7-su-menh-3', status: 'flagged',
     output: { intro: 'nội dung' }, edited_output: null,
     validation: { gates: [{ gate: 'schema', severity: 'fail', passed: true }] },
-    similarity: null, input_data: input, data_hash: await dataHash(input),
+    similarity: null, input_data: input as unknown as Record<string, unknown>, data_hash: await dataHash(input),
     ...over,
   });
   return id;
@@ -418,6 +433,75 @@ Deno.test('re-running a drained job is idempotent: cached generates, no new pend
     item_keys: ['so-chu-dao-2-su-menh-2', 'so-chu-dao-3-su-menh-3'],
   });
   assertEquals((await recreate.json()).inserted, 0);
+});
+
+Deno.test('regenerate resets in-review items to pending; published items need a version bump (audit fix)', async () => {
+  const w = makeWorld();
+  const create = await call(w.deps, 'POST', '/jobs', {
+    template_key: 'combo-so-chu-dao-su-menh',
+    item_keys: ['so-chu-dao-7-su-menh-1', 'so-chu-dao-7-su-menh-2'],
+  });
+  const { job_id } = await create.json();
+  await call(w.deps, 'POST', `/jobs/${job_id}/run`); // both → generated
+  // Publish one; leave the other in review.
+  const gen = [...w.items.values()].filter((i) => i.job_id === job_id);
+  const pubItem = gen.find((i) => i.item_key === 'so-chu-dao-7-su-menh-1')!;
+  await call(w.deps, 'POST', `/items/${pubItem.id}/approve`);
+  await call(w.deps, 'POST', `/items/${pubItem.id}/publish`);
+
+  const regen = await call(w.deps, 'POST', '/jobs', {
+    template_key: 'combo-so-chu-dao-su-menh',
+    mode: 'regenerate',
+    item_keys: ['so-chu-dao-7-su-menh-1', 'so-chu-dao-7-su-menh-2'],
+  });
+  const body = await regen.json();
+  // Regenerate keeps published keys in the work-list and classifies them:
+  // the in-review item is re-queued; the published one is reported for a
+  // version bump and left untouched (protecting live content).
+  assertEquals(body.inserted, 0);
+  assertEquals(body.regenerated, 1);
+  assertEquals(body.needs_version_bump, ['so-chu-dao-7-su-menh-1']);
+  const other = gen.find((i) => i.item_key === 'so-chu-dao-7-su-menh-2')!;
+  assertEquals(other.status, 'pending', 'in-review item re-queued for regeneration');
+  assertEquals(other.job_id, body.job_id, 'reassigned to the regenerate job');
+  assertEquals(pubItem.status, 'published', 'published item left live, untouched');
+});
+
+Deno.test('edit RE-GATES: editing clean content to add a banned phrase blocks approve (ground rule 1, audit fix)', async () => {
+  const w = makeWorld();
+  const id = await seedItem(w, {
+    status: 'generated',
+    output: { intro: 'nội dung sạch sẽ', metaDescription: 'ổn' },
+    validation: { gates: [{ gate: 'banned_phrases', severity: 'fail', passed: true }] },
+  });
+  // Clean item approves fine before the edit.
+  // Now a reviewer edits in a banned phrase.
+  const edit = await call(w.deps, 'POST', `/items/${id}/edit`, {
+    edited_output: { intro: 'đây là nội dung bị cấm', metaDescription: 'ổn' },
+  });
+  assertEquals(edit.status, 200);
+  assertEquals((await edit.json()).regated, true);
+  // The re-gated validation now carries a red fail → approve refuses.
+  const gates = w.items.get(id)!.validation.gates ?? [];
+  assert(gates.some((g) => g.gate === 'banned_phrases' && !g.passed), 'banned_phrases recomputed as failing');
+  const approve = await call(w.deps, 'POST', `/items/${id}/approve`);
+  assertEquals(approve.status, 409);
+});
+
+Deno.test('POST /jobs with unresolvable item_keys → 400, not 500 (audit fix)', async () => {
+  const w = makeWorld();
+  const res = await call(w.deps, 'POST', '/jobs', {
+    template_key: 'combo-so-chu-dao-su-menh',
+    item_keys: ['not-a-combo-key'],
+  });
+  assertEquals(res.status, 400);
+});
+
+Deno.test('GET /metrics?window=abc → 200 with default window, not 500 (audit fix)', async () => {
+  const w = makeWorld();
+  const res = await call(w.deps, 'GET', '/metrics?window=abc');
+  assertEquals(res.status, 200);
+  assertEquals((await res.json()).window_days, 28);
 });
 
 // ── Adaptive sampling ────────────────────────────────────────────────────────

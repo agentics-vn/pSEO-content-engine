@@ -62,17 +62,26 @@ export class RemoteSource implements DataSource {
   }
 
   async load(): Promise<DashboardData> {
-    const [stats, jobs, review] = await Promise.all([
+    // The actionable queue is every item awaiting a human decision: flagged
+    // (needs review), generated (clean, needs approve+publish), and approved
+    // (needs publish). Fetching only `flagged` stranded clean items AND made
+    // Publish unreachable — an approved item dropped off the list on reload.
+    const [stats, jobs, flagged, generated, approved] = await Promise.all([
       this.call('GET', '/stats'),
       this.call('GET', '/jobs?limit=30'),
-      this.call('GET', '/items?status=flagged&limit=30'),
+      this.call('GET', '/items?status=flagged&limit=50'),
+      this.call('GET', '/items?status=generated&limit=50'),
+      this.call('GET', '/items?status=approved&limit=50'),
     ]);
     return {
       siteSlug: this.cfg.siteSlug,
       adminName: this.cfg.email.split('@')[0],
-      stats,
+      // Guard: a transient /stats failure must not white-screen the dashboard.
+      stats: stats.ok
+        ? stats
+        : { items_by_status: {}, published_total: 0, tokens_in: 0, tokens_out: 0 },
       jobs: jobs.jobs ?? [],
-      review: review.items ?? [],
+      review: [...(flagged.items ?? []), ...(approved.items ?? []), ...(generated.items ?? [])],
     };
   }
 

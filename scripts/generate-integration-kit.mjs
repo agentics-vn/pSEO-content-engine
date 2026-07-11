@@ -354,7 +354,7 @@ jobs:
         env:
           ENGINE_URL: \${{ vars.ENGINE_URL }}
           ${KEY_ENV}: \${{ secrets.${KEY_ENV} }}
-          PAGES_PREFIX: / # ← set to the programmatic cluster's path prefix
+          PAGES_PREFIX: '' # ← REQUIRED: set to the cluster path prefix (e.g. /than-so-hoc/); the job fails until you do
 `);
 
 // ── Performance loop: GSC → engine metrics ───────────────────────────────────
@@ -370,24 +370,38 @@ await write('scripts/report-performance.mjs', `/**
 import { GoogleAuth } from 'google-auth-library';
 
 const PROPERTY = process.env.GSC_PROPERTY ?? 'sc-domain:${DOMAIN}';
-const PREFIX = process.env.PAGES_PREFIX ?? '/'; // path prefix of the programmatic cluster
+const PREFIX = process.env.PAGES_PREFIX; // path prefix of the programmatic cluster, e.g. /than-so-hoc/
 const ENGINE_URL = process.env.ENGINE_URL;
 const KEY = process.env.${KEY_ENV};
 if (!ENGINE_URL || !KEY) throw new Error('[perf] ENGINE_URL and ${KEY_ENV} required');
+// PAGES_PREFIX must scope to the programmatic cluster. Default '/' would map
+// EVERY indexed URL (home, /about, /blog/x) to an item_key and pollute the
+// engine's page_metrics with keys that aren't content items.
+if (!PREFIX || PREFIX === '/') throw new Error('[perf] PAGES_PREFIX must be set to the cluster path prefix (e.g. /than-so-hoc/), not "/"');
 
 const end = new Date(Date.now() - 2 * 86400000).toISOString().slice(0, 10);   // GSC lags ~2 days
 const start = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
 
 const auth = new GoogleAuth({ scopes: ['https://www.googleapis.com/auth/webmasters.readonly'] });
 const client = await auth.getClient();
-const { data } = await client.request({
-  method: 'POST',
-  url: \`https://www.googleapis.com/webmasters/v3/sites/\${encodeURIComponent(PROPERTY)}/searchAnalytics/query\`,
-  data: { startDate: start, endDate: end, dimensions: ['page', 'date'], rowLimit: 25000 },
-});
+
+// Paginate: GSC caps a response at 25k rows; walk startRow so large clusters
+// don't silently lose pages past the first 25k.
+const PAGE = 25000;
+const gscRows = [];
+for (let startRow = 0; ; startRow += PAGE) {
+  const { data } = await client.request({
+    method: 'POST',
+    url: \`https://www.googleapis.com/webmasters/v3/sites/\${encodeURIComponent(PROPERTY)}/searchAnalytics/query\`,
+    data: { startDate: start, endDate: end, dimensions: ['page', 'date'], rowLimit: PAGE, startRow },
+  });
+  const batch = data.rows ?? [];
+  gscRows.push(...batch);
+  if (batch.length < PAGE) break;
+}
 
 // page URL → item_key: last path segment of pages under PREFIX.
-const rows = (data.rows ?? []).flatMap((r) => {
+const rows = gscRows.flatMap((r) => {
   const path = new URL(r.keys[0]).pathname;
   if (!path.startsWith(PREFIX)) return [];
   const item_key = path.replace(/\\/$/, '').split('/').pop();

@@ -63,15 +63,23 @@ Sign in: `POST {SUPABASE_URL}/auth/v1/token?grant_type=password` with
 
 - `GET /metrics?window=28` per site.
 - **Needs refresh**: impressions ≥ 500 AND avg_position > 10. Compose the
-  work-list (item_keys + why).
+  candidate list (item_keys + why).
 - **Winners to expand**: top pages by revenue, then clicks — note any axis
   neighborhoods (same row/column) not yet published; propose them as the
   next batch.
-- If `REFRESH_AUTOPILOT=true` and the refresh list has ≤20 items: create ONE
-  regenerate job for them (`POST /jobs` with `item_keys`, `mode:
-  "regenerate"`, omit review_sample_pct → adaptive) and run-drain it. The
-  results still land in the review queue — nothing publishes itself.
-  Otherwise: the list goes in the digest as a recommendation.
+- **Refreshing PUBLISHED pages requires a new template_version, NOT a
+  regenerate job.** Immutable versions + the cache key mean an already-
+  published page cannot be re-generated in place (a `mode:"regenerate"` job
+  reports these under `needs_version_bump` and does not touch them, to protect
+  live content). So the correct refresh move is a Seat-1 template edit → new
+  version → normal job. Put refresh candidates in the digest as a recommendation
+  to bump the template version; do NOT try to auto-fix published pages.
+- `REFRESH_AUTOPILOT=true` only covers re-running items still IN REVIEW
+  (generated/flagged/failed) via `POST /jobs {item_keys, mode:"regenerate"}`
+  (≤20 items, omit review_sample_pct → adaptive, run-drain). Check the job
+  response: `regenerated` = items re-queued, `needs_version_bump` = published
+  keys skipped (recommend a version bump for those). Results land in review —
+  nothing publishes itself.
 - No metrics rows at all → note that the site's `report-performance.mjs`
   job may not be wired; include the kit instructions pointer.
 

@@ -22,7 +22,6 @@ export interface GateContext {
   output: Record<string, unknown>;   // the generated item
   guards: Record<string, any>;       // resolved guards JSON (placeholders filled)
   computed: Record<string, number>;  // input_data numbers for numeric/required checks
-  batch?: Array<Record<string, unknown>>; // sibling items, for batch-scope gates
 }
 
 // ── Per-item gates ───────────────────────────────────────────────────────────

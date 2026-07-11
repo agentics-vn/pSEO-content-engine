@@ -350,6 +350,39 @@ export interface GenerateRequest {
 }
 
 /**
+ * Assemble the per-item gate results for an output against a template + its
+ * input_data: schema, the generic per-item gates over resolved guards, and
+ * faq_shape. Used by generateItem AND by prose-admin's edit handler (so a
+ * reviewer edit is re-gated — the fail-gate publish guarantee must hold for
+ * edited_output, not just the original output). Batch gates are separate.
+ */
+export function assembleItemGates(
+  output: Record<string, unknown>,
+  template: { output_schema: Record<string, unknown>; guards: Record<string, unknown> },
+  inputData: Record<string, unknown>,
+): GateResult[] {
+  const guards = template.guards as Guards;
+  const resolved = resolveGuards(guards, inputData);
+  const gates: GateResult[] = [];
+  if (guards.schema !== undefined) {
+    const errs = validateSchema(output, template.output_schema);
+    gates.push({ gate: 'schema', severity: 'fail', passed: errs.length === 0,
+                 detail: errs.slice(0, 8).join('; ') || undefined });
+  }
+  const computedCfg = guards.numeric_consistency as { computed?: string[] } | undefined;
+  const computed: Record<string, number> = {};
+  for (const field of computedCfg?.computed ?? []) {
+    const v = inputData[field];
+    if (typeof v === 'number') computed[field] = v;
+  }
+  gates.push(...runItemGates({ output, guards: resolved, computed }));
+  if (guards.faq_shape !== undefined) {
+    gates.push(gateFaqShape(output, resolved.faq_shape as { count?: number; answers_must_contain?: string[] }));
+  }
+  return gates;
+}
+
+/**
  * Generate exactly ONE item: cache check → prompt build (constraint notes are
  * NOT optional) → forced strict tool call → coerce → gates → persist status.
  */
@@ -413,23 +446,7 @@ export async function generateItem(deps: GenerateDeps, req: GenerateRequest): Pr
 
   // Gates: schema (mirrors strict mode), generic per-item gates over resolved
   // guards, faq_shape. Batch gates run later in prose-admin.
-  const resolved = resolveGuards(template.guards, item.input_data);
-  const schemaErrors = validateSchema(output, template.output_schema);
-  const gates: GateResult[] = [];
-  if (template.guards.schema !== undefined) {
-    gates.push({ gate: 'schema', severity: 'fail', passed: schemaErrors.length === 0,
-                 detail: schemaErrors.slice(0, 8).join('; ') || undefined });
-  }
-  const computedCfg = template.guards.numeric_consistency as { computed?: string[] } | undefined;
-  const computed: Record<string, number> = {};
-  for (const field of computedCfg?.computed ?? []) {
-    const v = item.input_data[field];
-    if (typeof v === 'number') computed[field] = v;
-  }
-  gates.push(...runItemGates({ output, guards: resolved, computed }));
-  if (template.guards.faq_shape !== undefined) {
-    gates.push(gateFaqShape(output, resolved.faq_shape as { count?: number; answers_must_contain?: string[] }));
-  }
+  const gates = assembleItemGates(output, template, item.input_data);
 
   const reviewPct = await deps.getJobReviewPct(item.job_id);
   const anyFail = hasFailingGate(gates);
