@@ -13,7 +13,6 @@
  *   generateItem       the per-item flow with injected db/llm deps
  */
 
-import { computeComboFacts, type ComboFacts, type CoreNumber } from '@pseo/numerology-core';
 import { dataHash } from '../_shared/hash.ts';
 import {
   runItemGates,
@@ -244,24 +243,9 @@ export function validateSchema(value: unknown, schema: unknown, path = '$'): str
   return errors;
 }
 
-// ── Domain input builder (sochumenh combo axis) ──────────────────────────────
-
-const COMBO_KEY_RE = /^so-chu-dao-(\d{1,2})-su-menh-(\d{1,2})$/;
-
-/**
- * Build input_data for a combo item_key. The one domain-aware seam in the
- * engine: item keys of the combo template resolve through the SHARED
- * @pseo/numerology-core (ground rule 2). `maturitySum` is included so the
- * numeric_consistency gate accepts the intermediate "7 + 3 = 10" the prose is
- * explicitly asked to show.
- */
-export function buildComboInput(itemKey: string): ComboFacts & { maturitySum: number } {
-  const m = COMBO_KEY_RE.exec(itemKey);
-  if (!m) throw new Error(`[prose-generate] item_key "${itemKey}" is not a combo key`);
-  const facts = computeComboFacts(Number(m[1]) as CoreNumber, Number(m[2]) as CoreNumber);
-  if (facts.slug !== itemKey) throw new Error(`[prose-generate] slug drift for "${itemKey}"`);
-  return { ...facts, maturitySum: (facts.lifePath as number) + (facts.destiny as number) };
-}
+// Domain input builder lives in _shared/inputs.ts (prose-admin needs the same
+// builder to create pending items); re-exported here for the generate flow.
+export { buildComboInput } from '../_shared/inputs.ts';
 
 /** Deterministic review sampling: same item_key always samples the same way. */
 export function reviewSampleHit(itemKey: string, pct: number): boolean {
