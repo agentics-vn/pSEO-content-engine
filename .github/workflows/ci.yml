@@ -12,11 +12,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: '22' }
-      - run: npm test
-        working-directory: packages/numerology-core
-      - run: npx tsc --noEmit -p .
-        working-directory: packages/numerology-core
+        with: { node-version: '22', cache: npm, cache-dependency-path: package-lock.json }
+      - run: npm ci
+      - run: npm test -w @pseo/numerology-core
+      - run: npm run typecheck -w @pseo/numerology-core
 
   functions:
     name: edge functions (Deno)
