@@ -1,7 +1,6 @@
 {
-  "_fictional": "Reference tenant for the hand-off contract — not a real client.",
-  "slug": "giavang24h",
-  "name": "Giá Vàng 24h",
-  "domain": "giavang24h.vn",
-  "notes": "Axis: city × metal. Facts from the client's price API, refreshed daily; prose regenerates automatically when the facts (and thus data_hash) change."
+  "slug": "sochumenh",
+  "name": "Số Chủ Mệnh",
+  "domain": "sochumenh.vn",
+  "notes": "Tenant #1. Consumes template combo-so-chu-dao-su-menh over content-api at build time; recomputes @pseo/numerology-core to assert no drift."
 }
