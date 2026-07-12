@@ -1,0 +1,25 @@
+# fly.toml — Admin UI for the pSEO Content Engine
+#
+# Deploy from repo root:
+#   fly deploy ./admin
+#
+# App already exists under org agentics-vn (region sin).
+
+app = 'pseo-content-engine'
+primary_region = 'sin'
+
+[build]
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ['app']
+
+[[vm]]
+  memory = '1gb'
+  cpu_kind = 'shared'
+  cpus = 1
+  memory_mb = 512

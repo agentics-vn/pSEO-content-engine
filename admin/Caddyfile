@@ -1,0 +1,19 @@
+# Static SPA for the pSEO Engine Admin UI (Fly.io).
+:8080 {
+	root * /srv
+	encode gzip
+
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		Referrer-Policy strict-origin-when-cross-origin
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		-Server
+	}
+
+	handle {
+		try_files {path} /index.html
+		file_server
+	}
+}

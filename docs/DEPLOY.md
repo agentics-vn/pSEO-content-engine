@@ -132,14 +132,33 @@ an existing template version, and mints a fresh key each time.
 
 ## 5. Admin UI + end-to-end smoke test
 
+### Local
+
 ```sh
 cd admin
-cp .env.example .env    # if present
-# set:
-#   VITE_SUPABASE_URL=https://mafqvoahltslxwttmvkn.supabase.co
-#   VITE_SUPABASE_ANON_KEY=<anon key>
 npm install && npm run dev
 ```
+
+Open the login form and fill in:
+- **Supabase URL** — `https://mafqvoahltslxwttmvkn.supabase.co`
+- **Supabase anon key** — Dashboard → Project Settings → API
+- **prose-admin URL** — `https://mafqvoahltslxwttmvkn.supabase.co/functions/v1/prose-admin`
+- **Site slug** — `sochumenh`
+- Email / password from step 3
+
+### Fly.io (production Admin UI)
+
+App: `pseo-content-engine` → `https://pseo-content-engine.fly.dev`  
+Org: `agentics-vn` · region: `sin` · static SPA via Caddy.
+
+```sh
+# From repo root (build context = admin/)
+fly deploy ./admin
+```
+
+Config files live under `admin/` (`Dockerfile`, `Caddyfile`, `fly.toml`). No
+build-time secrets — operators paste Supabase URL / anon key / prose-admin URL
+on the login screen (stored in localStorage, password never persisted).
 
 Log in with the admin user from step 3, then walk the loop:
 

@@ -56,7 +56,7 @@ for the go-live checklist.
 | sochumenh seed + `scripts/load-seed.ts` | ✅ loadable · ⬜ load (needs service-role key) |
 | `ANTHROPIC_API_KEY` secret + admin login + golden set | ⬜ ops step (WP6) |
 | Central GSC collector + per-project performance ingestion | ✅ implemented |
-| Admin UI (`admin/` — dashboard, review queue, jobs) | ✅ implemented |
+| Admin UI (`admin/` — dashboard, review queue, jobs) | ✅ implemented · Fly: `pseo-content-engine` |
 | Scheduled Routines (steward + GSC collector) | ⬜ enable after go-live |
 
 ## Admin UI
@@ -68,11 +68,13 @@ membership) — it shows only live engine data. Dashboard: generation bubbles,
 job-runs calendar, gate-pass-rate gauge (goal 90%, WP6 acceptance), 144-combo
 grid coverage, and the review queue with per-gate pill strips —
 approve/publish/reject inline (approve surfaces the 409 when a fail-severity
-gate is red). Point it at the project with `VITE_SUPABASE_URL` +
-`VITE_SUPABASE_ANON_KEY` (see `docs/DEPLOY.md` §5).
+gate is red). On login, paste the engine Supabase URL, anon key, and
+`prose-admin` URL (see `docs/DEPLOY.md` §5). Production host:
+`https://pseo-content-engine.fly.dev`.
 
 ```sh
 cd admin && npm install && npm run dev     # or npm run build → dist/
+fly deploy ./admin                         # from repo root → Fly.io
 ```
 
 ## Running tests
