@@ -54,8 +54,17 @@ reviews and publishes**.
 - **A site-scoped API key** — printed once by `load-seed`. Read-only, sees only
   your own tenant. Put it in this repo's build secrets (e.g. `<CLIENT>_CONTENT_KEY`).
 - **Published content** over `content-api`, live the moment the engine publishes:
-  `…/v1/sites/<slug>/published?template=<key>`.
-- **(optional) a webhook** the engine calls on publish, to trigger your rebuild.
+  `…/v1/sites/<slug>/published?template=<key>`. Each row is
+  `{ item_key, template_key, template_version, output, updated_at, facts }`.
+- **`facts` — engine-computed deterministic values** (the numbers/labels a page
+  stands on) delivered on every row alongside `output`. **Render them; do NOT
+  recompute** — re-deriving them site-side just reintroduces a fork. Merge as
+  `{ ...output, ...facts }`.
+- **The publish webhook** — your go-live signal. Register a rebuild URL once
+  (`POST …/v1/sites/<slug>/webhooks` with your key + a host *deploy hook* URL)
+  and every publish triggers a fresh build automatically — no human "it's live
+  now" ping. First go-live is still one deliberate flip (enable the pull); the
+  webhook automates every publish after that.
 
 **3. You again (Phase C — in this repo).**
 Wire `pull-combos.mjs` (see `example-pull-script.mjs`) into `prebuild` with that

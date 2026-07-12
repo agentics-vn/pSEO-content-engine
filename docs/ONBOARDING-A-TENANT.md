@@ -42,6 +42,25 @@ by the time the engine publishes, the components and pull script are already
 merged. The [`phase-a-handoff/`](./phase-a-handoff/) package is the complete
 reference — contract, method, a real example seed, and a kickoff prompt.
 
+## Run it in ONE session — add both repos, don't relay
+
+The A→B→C above spans two repos, but that does **not** mean two Claude sessions
+passing notes through you. That relay is the single biggest source of friction —
+avoid it. Start **one** session and add both repos to it (`add_repo` the site
+repo into the engine session, or vice-versa); one agent then does the site-side
+authoring **and** the engine-side load/generate/job (via the Supabase MCP) with
+no copy-paste hand-off. The seed folder, the API key, and the "published" signal
+stop being chat messages and become in-session steps.
+
+Only two things genuinely need a human, by design:
+- **Review + Publish** — the quality gate. Keep a person here.
+- **One-time secrets** — the service-role / Anthropic keys stay on your machine;
+  the site's read key is handed over once. These are single events, not a loop.
+
+Everything else — validate, load, create the golden job, wire the pull — one
+session does end to end. (Cross-org note: the engine lives in `agentics-vn` and
+sites often in another org; the session needs GitHub scope for both.)
+
 ---
 
 The engine is multi-tenant by construction: every row is scoped by `site_id`,
