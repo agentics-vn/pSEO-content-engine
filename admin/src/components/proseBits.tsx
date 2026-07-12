@@ -1,13 +1,22 @@
 import type { GateResult } from '../types';
-import { gatesOf, prettyKey, shortStatus } from '../lib/format';
+import { gatesOf, prettyKey, shortStatus, actualCostUsd, fmtUsd } from '../lib/format';
 import type { ReviewItem } from '../types';
 
 export function StatusPill({ status }: { status: string }) {
   return <span className={`st st-${status}`}>{shortStatus(status)}</span>;
 }
 
-/** Status dot + item name — no text labels. */
-export function ReviewListItem({ item, active }: { item: ReviewItem; active: boolean }) {
+/** Status dot + item name — optional cost on the right. */
+export function ReviewListItem({
+  item,
+  active,
+  model,
+}: {
+  item: ReviewItem;
+  active: boolean;
+  model?: string;
+}) {
+  const cost = actualCostUsd(item.tokens_in ?? 0, item.tokens_out ?? 0, model);
   return (
     <span className={`review-list-item${active ? ' on' : ''}`}>
       <span
@@ -16,6 +25,7 @@ export function ReviewListItem({ item, active }: { item: ReviewItem; active: boo
         aria-label={shortStatus(item.status)}
       />
       <span className="rli-title" title={prettyKey(item.item_key)}>{prettyKey(item.item_key)}</span>
+      {cost > 0 && <span className="rli-cost" title={`${item.tokens_in ?? 0} in / ${item.tokens_out ?? 0} out`}>{fmtUsd(cost)}</span>}
     </span>
   );
 }

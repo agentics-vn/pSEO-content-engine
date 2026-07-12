@@ -113,6 +113,8 @@ export interface AdminItemRow {
   };
   similarity: number | null;
   regen_count?: number;
+  tokens_in?: number;
+  tokens_out?: number;
 }
 
 export interface AdminDeps {

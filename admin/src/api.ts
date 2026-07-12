@@ -62,7 +62,7 @@ export function savedCredentials(): Omit<LoginCredentials, 'password'> | null {
 }
 
 function mapJob(j: Record<string, unknown>): JobRow {
-  const tpl = j.prose_templates as { key?: string } | null;
+  const tpl = j.prose_templates as { key?: string; model?: string } | null;
   return {
     id: j.id as string,
     status: j.status as string,
@@ -73,6 +73,7 @@ function mapJob(j: Record<string, unknown>): JobRow {
     created_at: j.created_at as string,
     finished_at: (j.finished_at as string | null) ?? null,
     template: tpl?.key,
+    model: tpl?.model,
     review_sample_pct: j.review_sample_pct as number | undefined,
   };
 }

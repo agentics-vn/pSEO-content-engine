@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { CreateJobInput, DataSource, JobRow, TemplateRow } from '../types';
 import { countComboGrid } from '../lib/comboGrid';
-import { estimateJobCost } from '../lib/format';
+import { estimateJobCost, actualCostUsd, fmtUsd } from '../lib/format';
 import { latestPerKey } from '../lib/templates';
 import { drainJob } from '../lib/runJob';
 import { navigate } from '../router';
@@ -167,6 +167,7 @@ export function JobsPage({
               <th>Template</th>
               <th>Status</th>
               <th>Items</th>
+              <th>Actual cost</th>
               <th />
             </tr>
           </thead>
@@ -177,6 +178,9 @@ export function JobsPage({
                 <td>{j.template ?? '—'}</td>
                 <td><span className={`st st-${j.status}`}>{j.status}</span></td>
                 <td>{j.item_count}</td>
+                <td className="cost" title={`${j.tokens_in} in / ${j.tokens_out} out`}>
+                  {fmtUsd(actualCostUsd(j.tokens_in, j.tokens_out, j.model))}
+                </td>
                 <td className="row-actions">
                   <button type="button" className="btn-ghost sm" onClick={() => navigate({ page: 'review', jobId: j.id })}>Review</button>
                   {j.status !== 'done' && (
@@ -188,7 +192,7 @@ export function JobsPage({
               </tr>
             ))}
             {jobs.length === 0 && (
-              <tr><td colSpan={5} className="empty">No jobs — create one above.</td></tr>
+              <tr><td colSpan={6} className="empty">No jobs — create one above.</td></tr>
             )}
           </tbody>
         </table>

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { DataSource, JobRow, ReviewItem } from '../types';
-import { gatesOf, prettyKey } from '../lib/format';
+import { gatesOf, prettyKey, actualCostUsd, fmtUsd } from '../lib/format';
 import { navigate } from '../router';
 import { GateList, OutputPreview, ReviewListItem, StatusPill } from '../components/proseBits';
 
@@ -47,6 +47,9 @@ export function ReviewPage({
   const filtered = items.filter((it) => matches(it, filter));
   const current = filtered[Math.min(idx, Math.max(filtered.length - 1, 0))] ?? null;
   const displayOutput = current?.edited_output ?? current?.output ?? null;
+  const model = job?.model ?? 'claude-sonnet';
+  const jobCost = job ? actualCostUsd(job.tokens_in, job.tokens_out, model) : 0;
+  const itemsCost = items.reduce((s, it) => s + actualCostUsd(it.tokens_in ?? 0, it.tokens_out ?? 0, model), 0);
 
   const reload = useCallback(async (anchorId?: string) => {
     const [jobRow, list] = await Promise.all([
@@ -163,6 +166,10 @@ export function ReviewPage({
           <p>
             <code>{jobId.slice(0, 8)}</code>
             {job && <> · {job.template} · {job.item_count} items · {job.status}</>}
+            {' · '}
+            <span className="cost" title="Job actual cost from recorded tokens">
+              {fmtUsd(jobCost || itemsCost)}
+            </span>
           </p>
         </div>
         <div className="grow" />
@@ -193,7 +200,7 @@ export function ReviewPage({
               {filtered.map((it, i) => (
                 <li key={it.id}>
                   <button type="button" className={i === Math.min(idx, filtered.length - 1) ? 'on' : ''} onClick={() => selectIdx(i)}>
-                    <ReviewListItem item={it} active={i === Math.min(idx, filtered.length - 1)} />
+                    <ReviewListItem item={it} active={i === Math.min(idx, filtered.length - 1)} model={model} />
                   </button>
                 </li>
               ))}
@@ -206,6 +213,10 @@ export function ReviewPage({
                 <b className="detail-title">{prettyKey(current.item_key)}</b>
                 <span className="meta">{current.template_key} v{current.template_version}
                   {current.regen_count ? ` · regen ${current.regen_count}/3` : ''}
+                  {' · '}
+                  <span className="cost" title={`${current.tokens_in ?? 0} in / ${current.tokens_out ?? 0} out`}>
+                    {fmtUsd(actualCostUsd(current.tokens_in ?? 0, current.tokens_out ?? 0, model))}
+                  </span>
                 </span>
               </div>
               <StatusPill status={current.status} />

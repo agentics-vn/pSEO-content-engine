@@ -41,15 +41,32 @@ export function gatesOf(it: ReviewItem): GateResult[] {
   return [...(it.validation.gates ?? []), ...(it.validation.batch_gates ?? [])];
 }
 
+/** Anthropic list prices ($ / MTok). Haiku vs Sonnet-class. */
+export function modelRates(model: string): { inPerM: number; outPerM: number } {
+  if (/haiku/i.test(model)) return { inPerM: 1, outPerM: 5 };
+  return { inPerM: 3, outPerM: 15 };
+}
+
+/** Actual USD from recorded token usage. */
+export function actualCostUsd(tokensIn: number, tokensOut: number, model = 'claude-sonnet'): number {
+  if (tokensIn <= 0 && tokensOut <= 0) return 0;
+  const { inPerM, outPerM } = modelRates(model);
+  return (tokensIn * inPerM + tokensOut * outPerM) / 1_000_000;
+}
+
+export function fmtUsd(n: number): string {
+  if (n <= 0) return '—';
+  if (n < 0.01) return `$${n.toFixed(4)}`;
+  return `$${n.toFixed(2)}`;
+}
+
 /** Client-side cost estimate (no LLM call). */
 export function estimateJobCost(itemCount: number, maxTokens: number, model: string): {
   items: number; estTokens: number; estUsd: number;
 } {
   const perItem = maxTokens * 1.4;
   const estTokens = Math.round(itemCount * perItem);
-  const isHaiku = /haiku/i.test(model);
-  const inRate = isHaiku ? 1 : 3;
-  const outRate = isHaiku ? 5 : 15;
-  const estUsd = (estTokens * 0.6 * inRate + estTokens * 0.4 * outRate) / 1_000_000;
+  const { inPerM, outPerM } = modelRates(model);
+  const estUsd = (estTokens * 0.6 * inPerM + estTokens * 0.4 * outPerM) / 1_000_000;
   return { items: itemCount, estTokens, estUsd: Math.round(estUsd * 100) / 100 };
 }

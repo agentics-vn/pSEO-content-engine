@@ -14,6 +14,8 @@ export interface ReviewItem {
   status: string;
   similarity: number | null;
   regen_count?: number;
+  tokens_in?: number;
+  tokens_out?: number;
   validation: { gates?: GateResult[]; batch_gates?: GateResult[] };
   output: Record<string, unknown> | null;
   edited_output: Record<string, unknown> | null;
@@ -30,6 +32,7 @@ export interface JobRow {
   created_at: string;
   finished_at: string | null;
   template?: string;
+  model?: string;
   review_sample_pct?: number;
 }
 

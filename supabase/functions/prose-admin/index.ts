@@ -10,7 +10,7 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
-const ITEM_COLS = 'id, site_id, job_id, template_key, template_version, item_key, status, input_data, output, edited_output, validation, similarity, regen_count';
+const ITEM_COLS = 'id, site_id, job_id, template_key, template_version, item_key, status, input_data, output, edited_output, validation, similarity, regen_count, tokens_in, tokens_out';
 
 const deps: AdminDeps = {
   async getUserId(jwt) {
@@ -133,7 +133,7 @@ const deps: AdminDeps = {
 
   async getJob(siteId, jobId) {
     const { data, error } = await supabase.from('prose_jobs')
-      .select('id, site_id, template_id, status, mode, review_sample_pct, item_count, tokens_in, tokens_out, created_at, finished_at, prose_templates ( key, version )')
+      .select('id, site_id, template_id, status, mode, review_sample_pct, item_count, tokens_in, tokens_out, created_at, finished_at, prose_templates ( key, version, model )')
       .eq('site_id', siteId).eq('id', jobId).maybeSingle();
     if (error) throw error;
     return data;
@@ -257,7 +257,7 @@ const deps: AdminDeps = {
 
   async listJobs(siteId, limit) {
     const { data, error } = await supabase.from('prose_jobs')
-      .select('id, status, mode, item_count, review_sample_pct, tokens_in, tokens_out, created_at, finished_at, prose_templates ( key, version )')
+      .select('id, status, mode, item_count, review_sample_pct, tokens_in, tokens_out, created_at, finished_at, prose_templates ( key, version, model )')
       .eq('site_id', siteId).order('created_at', { ascending: false }).limit(limit);
     if (error) throw error;
     return data ?? [];

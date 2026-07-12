@@ -320,6 +320,8 @@ export interface ItemRow {
   status: string;
   validation: Record<string, unknown>;
   regen_count: number;
+  tokens_in?: number;
+  tokens_out?: number;
 }
 
 export interface LlmRequest {
@@ -345,6 +347,8 @@ export interface GenerateDeps {
     status: string;
     validation: Record<string, unknown>;
     regen_count: number;
+    tokens_in: number;
+    tokens_out: number;
   }): Promise<void>;
   addJobUsage(jobId: string, tokensIn: number, tokensOut: number): Promise<void>;
   getJobReviewPct(jobId: string): Promise<number>;
@@ -467,11 +471,17 @@ export async function generateItem(deps: GenerateDeps, req: GenerateRequest): Pr
   const sampled = reviewSampleHit(item.item_key, reviewPct);
   const status = anyFail ? 'failed_validation' : anyFlag || sampled ? 'flagged' : 'generated';
 
+  // Accumulate tokens across regens so Actual Cost reflects total spend.
+  const tokensIn = (item.tokens_in ?? 0) + llmResult.tokensIn;
+  const tokensOut = (item.tokens_out ?? 0) + llmResult.tokensOut;
+
   await deps.saveResult(item, {
     output,
     status,
     validation: { gates, review_sampled: sampled },
     regen_count: req.mode === 'regenerate' ? item.regen_count + 1 : item.regen_count,
+    tokens_in: tokensIn,
+    tokens_out: tokensOut,
   });
 
   return { ok: true, status, cached: false, item_key: item.item_key, gates };

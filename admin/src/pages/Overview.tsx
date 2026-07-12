@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { DashboardData, DataSource, JobRow, ReviewItem } from '../types';
-import { fmt, fmtK, prettyKey } from '../lib/format';
+import { fmt, prettyKey, actualCostUsd, fmtUsd } from '../lib/format';
 import { drainJob } from '../lib/runJob';
 import { navigate } from '../router';
 import { ReviewListItem } from '../components/proseBits';
@@ -22,7 +22,10 @@ export function Overview({
 
   const s = data.stats.items_by_status;
   const needsReview = (s.generated ?? 0) + (s.flagged ?? 0) + (s.failed_validation ?? 0);
-  const tokens = data.stats.tokens_in + data.stats.tokens_out;
+  const totalCost = data.jobs.reduce(
+    (sum, j) => sum + actualCostUsd(j.tokens_in, j.tokens_out, j.model),
+    0,
+  );
   const runnable = data.jobs.filter((j) => j.status !== 'done');
   const queue = data.review.filter((it) =>
     ['generated', 'flagged', 'failed_validation'].includes(it.status),
@@ -57,7 +60,7 @@ export function Overview({
         <div className="stat"><b>{fmt(needsReview)}</b><span>needs review</span></div>
         <div className="stat"><b>{fmt(s.approved ?? 0)}</b><span>approved</span></div>
         <div className="stat"><b>{fmt(data.stats.published_total)}</b><span>published</span></div>
-        <div className="stat"><b>{fmtK(tokens)}</b><span>tokens</span></div>
+        <div className="stat"><b>{fmtUsd(totalCost)}</b><span>actual cost</span></div>
       </div>
 
       <div className="ops-layout">
@@ -78,7 +81,11 @@ export function Overview({
                 <span className={`rli-status rli-status--${j.status === 'running' ? 'flagged' : 'pending'}`} />
                 <div className="ops-body">
                   <b>{j.template ?? j.id.slice(0, 8)}</b>
-                  <span className="meta">{j.item_count} items · {j.status} · {j.id.slice(0, 8)}</span>
+                  <span className="meta">
+                    {j.item_count} items · {j.status} · {j.id.slice(0, 8)}
+                    {' · '}
+                    <span className="cost">{fmtUsd(actualCostUsd(j.tokens_in, j.tokens_out, j.model))}</span>
+                  </span>
                 </div>
                 <div className="ops-actions">
                   <button type="button" className="btn-ghost sm" onClick={() => navigate({ page: 'review', jobId: j.id })}>Review</button>
@@ -93,7 +100,11 @@ export function Overview({
                 <span className="rli-status rli-status--approved" />
                 <div className="ops-body">
                   <b>{j.template ?? j.id.slice(0, 8)}</b>
-                  <span className="meta">{j.item_count} items · done · {j.id.slice(0, 8)}</span>
+                  <span className="meta">
+                    {j.item_count} items · done · {j.id.slice(0, 8)}
+                    {' · '}
+                    <span className="cost">{fmtUsd(actualCostUsd(j.tokens_in, j.tokens_out, j.model))}</span>
+                  </span>
                 </div>
                 <div className="ops-actions">
                   <button type="button" className="btn-ghost sm" onClick={() => navigate({ page: 'review', jobId: j.id })}>Review</button>
