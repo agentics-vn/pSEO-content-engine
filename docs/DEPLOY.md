@@ -61,15 +61,19 @@ npx supabase functions deploy prose-generate \
   --project-ref mafqvoahltslxwttmvkn \
   --import-map supabase/functions/deno.json   # verify_jwt ON (default)
 
+# prose-admin validates the operator JWT + site_admins itself; gateway JWT
+# must be OFF so browser OPTIONS preflight (CORS) can reach the function.
 npx supabase functions deploy prose-admin \
   --project-ref mafqvoahltslxwttmvkn \
-  --import-map supabase/functions/deno.json   # verify_jwt ON (default)
+  --import-map supabase/functions/deno.json \
+  --no-verify-jwt
 ```
 
 - `prose-generate` — called only by the steward / prose-admin with the
   service-role bearer; keep `verify_jwt` **on**.
 - `prose-admin` — called by the Admin UI with the operator's Supabase-Auth JWT;
-  keep `verify_jwt` **on**. It then checks `site_admins` membership itself.
+  keep `verify_jwt` **off** (function checks JWT + `site_admins` itself; gateway
+  JWT would block browser CORS preflight).
 
 > Do **not** re-deploy `content-api` with `verify_jwt` on — it must stay off so
 > consuming sites can call it with an API key instead of a JWT.
@@ -209,7 +213,9 @@ Enable the two Routines once the engine is live and their env vars are set:
 ## Notes / gotchas
 
 - **`content-api` stays `verify_jwt=false`.** It's the one public function; it
-  gates on API keys. The other two stay `verify_jwt=true`.
+  gates on API keys. **`prose-admin` is also `verify_jwt=false`** (custom JWT +
+  membership check; needed for browser CORS). `prose-generate` stays
+  `verify_jwt=true`.
 - **`SUPABASE_*` secrets are automatic.** The README's older line about setting
   them "on all three" is superseded — only `ANTHROPIC_API_KEY` is manual.
 - **Template versions are immutable.** To change a template, bump its version;

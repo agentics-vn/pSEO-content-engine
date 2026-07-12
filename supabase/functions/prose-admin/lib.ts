@@ -15,6 +15,7 @@ import { enumerateComboGrid, comboSlug, isMaster, type CoreNumber } from '@pseo/
 import { buildComboInput } from '../_shared/inputs.ts';
 import { dataHash } from '../_shared/hash.ts';
 import { hasFailingGate, runBatchGates, type GateResult } from '../_shared/gates/index.ts';
+import { corsHeaders, corsPreflight } from '../_shared/cors.ts';
 import { assembleItemGates } from '../prose-generate/lib.ts';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -193,8 +194,11 @@ export interface AdminDeps {
   now(): number;
 }
 
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
+function json(body: unknown, status = 200, req?: Request): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'content-type': 'application/json', ...corsHeaders(req) },
+  });
 }
 
 /** All fail-severity gates across per-item AND batch scopes. */
@@ -210,23 +214,27 @@ export function makeAdminHandler(deps: AdminDeps, opts: { runBudgetMs?: number }
   const runBudgetMs = opts.runBudgetMs ?? 45_000;
 
   return async function handle(req: Request): Promise<Response> {
+    // Browser preflight from Admin UI (Fly / localhost) — must run before auth.
+    if (req.method === 'OPTIONS') return corsPreflight(req);
+
     const url = new URL(req.url);
     // Function may be served under /prose-admin or /functions/v1/prose-admin.
     const path = url.pathname.replace(/^.*?\/prose-admin/, '') || '/';
+    const reply = (body: unknown, status = 200) => json(body, status, req);
 
     // ── Auth: human admin via site_admins, one site per request ────────────
     const jwt = (req.headers.get('authorization') ?? '').replace(/^Bearer\s+/i, '');
-    if (!jwt) return json({ error: 'missing bearer token' }, 401);
+    if (!jwt) return reply({ error: 'missing bearer token' }, 401);
     const userId = await deps.getUserId(jwt);
-    if (!userId) return json({ error: 'invalid token' }, 401);
+    if (!userId) return reply({ error: 'invalid token' }, 401);
     const memberships = await deps.getMemberships(userId);
-    if (memberships.length === 0) return json({ error: 'no site membership' }, 403);
+    if (memberships.length === 0) return reply({ error: 'no site membership' }, 403);
     const wantSlug = req.headers.get('x-site-slug');
     const site = wantSlug
       ? memberships.find((m) => m.slug === wantSlug)
       : memberships.length === 1 ? memberships[0] : undefined;
     if (!site) {
-      return json({
+      return reply({
         error: wantSlug ? `not a member of site "${wantSlug}"` : 'multiple site memberships — set x-site-slug',
       }, 403);
     }
@@ -237,32 +245,32 @@ export function makeAdminHandler(deps: AdminDeps, opts: { runBudgetMs?: number }
       // Write endpoints require at least editor; review actions reviewer+.
       const isWrite = req.method === 'POST';
       if (isWrite && !atLeast(site.role, 'editor')) {
-        return json({ error: `role "${site.role}" cannot modify the pipeline` }, 403);
+        return reply({ error: `role "${site.role}" cannot modify the pipeline` }, 403);
       }
 
       // ── POST /templates — create/version (immutable per version) ─────────
       if (req.method === 'POST' && path === '/templates') {
         const t = await body<TemplateInput>();
         if (!t.key || !t.name || !t.system_prompt || !t.user_template || !t.output_schema || !t.model) {
-          return json({ error: 'key, name, system_prompt, user_template, output_schema, model are required' }, 400);
+          return reply({ error: 'key, name, system_prompt, user_template, output_schema, model are required' }, 400);
         }
         const latest = await deps.getLatestTemplateVersion(site.site_id, t.key);
         const version = t.version ?? (latest ?? 0) + 1;
         if (latest !== null && version <= latest) {
-          return json({ error: `version ${version} already exists (latest ${latest}); versions are immutable` }, 409);
+          return reply({ error: `version ${version} already exists (latest ${latest}); versions are immutable` }, 409);
         }
         const created = await deps.insertTemplate(site.site_id, userId, { ...t, version });
-        return json({ ok: true, template_id: created.id, key: t.key, version: created.version }, 201);
+        return reply({ ok: true, template_id: created.id, key: t.key, version: created.version }, 201);
       }
 
       // ── POST /jobs — create a job over a work-list ────────────────────────
       if (req.method === 'POST' && path === '/jobs') {
         const j = await body<JobInput>();
-        if (!j.template_key) return json({ error: 'template_key required' }, 400);
+        if (!j.template_key) return reply({ error: 'template_key required' }, 400);
         const version = j.template_version ?? (await deps.getLatestTemplateVersion(site.site_id, j.template_key));
-        if (version === null) return json({ error: `no template "${j.template_key}"` }, 404);
+        if (version === null) return reply({ error: `no template "${j.template_key}"` }, 404);
         const template = await deps.getTemplate(site.site_id, j.template_key, version);
-        if (!template) return json({ error: `no template "${j.template_key}" v${version}` }, 404);
+        if (!template) return reply({ error: `no template "${j.template_key}" v${version}` }, 404);
 
         // Build the work-list: explicit (item_key, input_data) rows are the
         // tenant-generic path; item_keys/enumerate resolve through the
@@ -271,9 +279,9 @@ export function makeAdminHandler(deps: AdminDeps, opts: { runBudgetMs?: number }
         if (j.items?.length) {
           const bad = j.items.find((it) => !it.item_key || !/^[a-z0-9][a-z0-9-]*$/.test(it.item_key)
             || !it.input_data || typeof it.input_data !== 'object');
-          if (bad) return json({ error: `invalid work-list row (item_key must be a slug, input_data an object): ${JSON.stringify(bad).slice(0, 120)}` }, 400);
+          if (bad) return reply({ error: `invalid work-list row (item_key must be a slug, input_data an object): ${JSON.stringify(bad).slice(0, 120)}` }, 400);
           const keys = new Set(j.items.map((it) => it.item_key));
-          if (keys.size !== j.items.length) return json({ error: 'duplicate item_key in work-list' }, 400);
+          if (keys.size !== j.items.length) return reply({ error: 'duplicate item_key in work-list' }, 400);
           workList = j.items;
         } else {
           let itemKeys: string[];
@@ -291,7 +299,7 @@ export function makeAdminHandler(deps: AdminDeps, opts: { runBudgetMs?: number }
           } else if (j.item_keys?.length) {
             itemKeys = j.item_keys;
           } else {
-            return json({ error: 'items, item_keys, or enumerate required' }, 400);
+            return reply({ error: 'items, item_keys, or enumerate required' }, 400);
           }
           // buildComboInput throws on a key the built-in enumerator can't
           // resolve — that's a client input error (400), not a server 500.
@@ -303,7 +311,7 @@ export function makeAdminHandler(deps: AdminDeps, opts: { runBudgetMs?: number }
               input_data: buildComboInput(item_key) as unknown as Record<string, unknown>,
             }));
           } catch (e) {
-            return json({ error: `item_keys not resolvable by the built-in input builder (use explicit \`items\` with input_data for this vertical): ${e instanceof Error ? e.message : e}` }, 400);
+            return reply({ error: `item_keys not resolvable by the built-in input builder (use explicit \`items\` with input_data for this vertical): ${e instanceof Error ? e.message : e}` }, 400);
           }
         }
 
@@ -316,7 +324,7 @@ export function makeAdminHandler(deps: AdminDeps, opts: { runBudgetMs?: number }
         if (mode !== 'regenerate') {
           const published = await deps.getPublishedItemKeys(site.site_id, j.template_key);
           workList = workList.filter((w) => !published.has(w.item_key));
-          if (workList.length === 0) return json({ error: 'work-list is empty after excluding published items' }, 400);
+          if (workList.length === 0) return reply({ error: 'work-list is empty after excluding published items' }, 400);
         }
 
         // Sampling: explicit value wins; otherwise adapt to the template's
@@ -327,7 +335,7 @@ export function makeAdminHandler(deps: AdminDeps, opts: { runBudgetMs?: number }
           const outcomes = await deps.getRecentItemOutcomes(site.site_id, j.template_key, 200);
           ({ pct: samplePct, basis: sampleBasis } = computeAutoSamplePct(outcomes));
         } else if (samplePct < 0 || samplePct > 100) {
-          return json({ error: 'review_sample_pct must be 0–100' }, 400);
+          return reply({ error: 'review_sample_pct must be 0–100' }, 400);
         }
 
         const job = await deps.insertJob({
@@ -368,7 +376,7 @@ export function makeAdminHandler(deps: AdminDeps, opts: { runBudgetMs?: number }
           needsVersionBump = r.published;
         }
 
-        return json({
+        return reply({
           ok: true, job_id: job.id, item_count: workList.length,
           inserted, regenerated,
           deduped: workList.length - inserted - regenerated - needsVersionBump.length,
@@ -381,7 +389,7 @@ export function makeAdminHandler(deps: AdminDeps, opts: { runBudgetMs?: number }
       const run = path.match(/^\/jobs\/([0-9a-f-]+)\/run$/);
       if (req.method === 'POST' && run) {
         const job = await deps.getJob(site.site_id, run[1]);
-        if (!job) return json({ error: 'job not found' }, 404);
+        if (!job) return reply({ error: 'job not found' }, 404);
 
         const started = deps.now();
         let processed = 0;
@@ -426,17 +434,17 @@ export function makeAdminHandler(deps: AdminDeps, opts: { runBudgetMs?: number }
           await deps.markJobDone(job.id);
           batchGatesRan = true;
         }
-        return json({ ok: true, processed, remaining, batch_gates_ran: batchGatesRan, failures });
+        return reply({ ok: true, processed, remaining, batch_gates_ran: batchGatesRan, failures });
       }
 
       // ── GET /jobs, GET /stats — dashboard reads ──────────────────────────
       if (req.method === 'GET' && path === '/jobs') {
         const jobs = await deps.listJobs(site.site_id, Number(url.searchParams.get('limit') ?? 20));
-        return json({ ok: true, jobs });
+        return reply({ ok: true, jobs });
       }
       if (req.method === 'GET' && path === '/stats') {
         const stats = await deps.getStats(site.site_id);
-        return json({ ok: true, ...stats });
+        return reply({ ok: true, ...stats });
       }
 
       // ── GET /metrics — the performance loop's read side ──────────────────
@@ -460,7 +468,7 @@ export function makeAdminHandler(deps: AdminDeps, opts: { runBudgetMs?: number }
         const items = rows
           .map((r) => ({ ...r, ctr: r.impressions > 0 ? r.clicks / r.impressions : null }))
           .sort((a, b) => b.clicks - a.clicks);
-        return json({ ok: true, window_days: windowDays, totals, items });
+        return reply({ ok: true, window_days: windowDays, totals, items });
       }
 
       // ── GET /items — review queue ────────────────────────────────────────
@@ -471,7 +479,7 @@ export function makeAdminHandler(deps: AdminDeps, opts: { runBudgetMs?: number }
           template_key: url.searchParams.get('template') ?? undefined,
           limit: Number(url.searchParams.get('limit') ?? 100),
         });
-        return json({ ok: true, items });
+        return reply({ ok: true, items });
       }
 
       // ── Per-item actions ─────────────────────────────────────────────────
@@ -481,38 +489,38 @@ export function makeAdminHandler(deps: AdminDeps, opts: { runBudgetMs?: number }
         // Review decisions are a reviewer/owner power — an editor can create
         // templates and jobs but never move content toward publish.
         if (!atLeast(site.role, 'reviewer')) {
-          return json({ error: `role "${site.role}" cannot ${verb} items` }, 403);
+          return reply({ error: `role "${site.role}" cannot ${verb} items` }, 403);
         }
         const item = await deps.getItem(site.site_id, itemId);
-        if (!item) return json({ error: 'item not found' }, 404);
+        if (!item) return reply({ error: 'item not found' }, 404);
 
         switch (verb) {
           case 'approve': {
             // ═══ GROUND RULE 1 — NON-NEGOTIABLE ═══
             // Refuse while any fail-severity gate (item OR batch) is red.
             if (hasFailingGate(allGates(item))) {
-              return json({
+              return reply({
                 error: 'cannot approve: fail-severity gate is red',
                 gates: allGates(item).filter((g) => g.severity === 'fail' && !g.passed),
               }, 409);
             }
             if (!REVIEWABLE.has(item.status)) {
-              return json({ error: `cannot approve from status "${item.status}"` }, 409);
+              return reply({ error: `cannot approve from status "${item.status}"` }, 409);
             }
             await deps.updateItem(itemId, { status: 'approved', reviewer: userId });
-            return json({ ok: true, status: 'approved' });
+            return reply({ ok: true, status: 'approved' });
           }
           case 'reject': {
-            if (item.status === 'published') return json({ error: 'published items are immutable' }, 409);
+            if (item.status === 'published') return reply({ error: 'published items are immutable' }, 409);
             const note = (await req.json().catch(() => ({}))) as { review_note?: string };
             await deps.updateItem(itemId, { status: 'rejected', reviewer: userId, review_note: note.review_note ?? null });
-            return json({ ok: true, status: 'rejected' });
+            return reply({ ok: true, status: 'rejected' });
           }
           case 'edit': {
             // Publishing is one-way (§5): a published item is never mutated.
-            if (item.status === 'published') return json({ error: 'published items are immutable — bump template_version and republish' }, 409);
+            if (item.status === 'published') return reply({ error: 'published items are immutable — bump template_version and republish' }, 409);
             const b = (await req.json()) as { edited_output?: Record<string, unknown> };
-            if (!b.edited_output || typeof b.edited_output !== 'object') return json({ error: 'edited_output (object) required' }, 400);
+            if (!b.edited_output || typeof b.edited_output !== 'object') return reply({ error: 'edited_output (object) required' }, 400);
             // RE-GATE the edit — otherwise a reviewer could edit clean content to
             // insert a banned phrase / bad length / unbacked number and it would
             // publish against STALE (green) gate results, defeating ground rule 1.
@@ -528,32 +536,32 @@ export function makeAdminHandler(deps: AdminDeps, opts: { runBudgetMs?: number }
               patch.validation = { ...(item.validation ?? {}), gates };
             }
             await deps.updateItem(itemId, patch);
-            return json({ ok: true, regated: !!tpl });
+            return reply({ ok: true, regated: !!tpl });
           }
           case 'publish': {
-            if (item.status === 'published') return json({ ok: true, status: 'published', already: true });
+            if (item.status === 'published') return reply({ ok: true, status: 'published', already: true });
             if (item.status !== 'approved') {
-              return json({ error: `only approved items publish (status "${item.status}")` }, 409);
+              return reply({ error: `only approved items publish (status "${item.status}")` }, 409);
             }
             // Belt & braces: approve is the gate-blocking step, but never let
             // a red fail gate through even if state was mangled manually.
             if (hasFailingGate(allGates(item))) {
-              return json({ error: 'cannot publish: fail-severity gate is red' }, 409);
+              return reply({ error: 'cannot publish: fail-severity gate is red' }, 409);
             }
             await deps.updateItem(itemId, { status: 'published', updated_at: new Date().toISOString() });
             const hooks = await deps.getWebhooks(site.site_id);
             await Promise.allSettled(hooks.map((h) =>
               deps.fireWebhook(h.url, { site: site.slug, template: item.template_key, item_count: 1 }),
             ));
-            return json({ ok: true, status: 'published' });
+            return reply({ ok: true, status: 'published' });
           }
         }
       }
 
-      return json({ error: 'not found' }, 404);
+      return reply({ error: 'not found' }, 404);
     } catch (err) {
-      if (err instanceof SyntaxError) return json({ error: 'invalid JSON body' }, 400);
-      return json({ error: String(err instanceof Error ? err.message : err) }, 500);
+      if (err instanceof SyntaxError) return reply({ error: 'invalid JSON body' }, 400);
+      return reply({ error: String(err instanceof Error ? err.message : err) }, 500);
     }
   };
 }

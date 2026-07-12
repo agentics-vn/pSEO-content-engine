@@ -83,6 +83,7 @@ export class RemoteSource implements DataSource {
       method,
       headers: {
         authorization: `Bearer ${this.token}`,
+        apikey: this.cfg.supabaseAnonKey,
         'x-site-slug': this.cfg.siteSlug,
         'content-type': 'application/json',
       },
