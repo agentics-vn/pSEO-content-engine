@@ -175,13 +175,13 @@ Operators never paste engine credentials — only site + login.
 
 Log in with the admin user from step 3, then walk the loop:
 
-1. **Create job** on `combo-so-chu-dao-su-menh` (master = exclude,
+1. **Templates** (`#/templates`) — list versions, edit prompts, dry-run test panel (`POST /templates/test`).
+2. **Create job** (`#/jobs`) on `combo-so-chu-dao-su-menh` (combo grid, master = exclude,
    review_sample_pct = 100 for the golden set).
-2. **Run job** — it invokes `prose-generate` per item until none are pending.
-3. **Review** the generated items; **approve** clean ones. The fail-gate block
-   is enforced on approve — a red gate can't be approved, only rejected.
-4. **Publish** an approved item.
-5. Confirm it's served:
+3. **Run job** — it invokes `prose-generate` per item until none are pending.
+4. **Review** (`#/jobs/:id/review`) — dual pane, edit JSON, regen (cap 3), approve/reject+note.
+5. **Publish** (`#/publish`) — bulk publish approved items.
+6. Confirm it's served:
 
 ```sh
 curl -s -H "Authorization: Bearer <raw key from step 4>" \
@@ -190,6 +190,22 @@ curl -s -H "Authorization: Bearer <raw key from step 4>" \
 
 A published item comes back as JSON. That round trip — generate → gate → review
 → publish → served over the API — is the true go-live proof.
+
+### prose-admin API (operator UI)
+
+| Method | Path | Notes |
+|--------|------|-------|
+| GET | `/templates` | List site templates (newest version per key) |
+| GET | `/templates/:key` | Full row; `?version=` optional |
+| POST | `/templates` | Create immutable new version |
+| POST | `/templates/test` | Dry-run via `prose-generate` (`dry_run: true`) |
+| GET | `/jobs`, `/jobs/:id` | Job list + single job |
+| POST | `/jobs` | Create (`items`, `item_keys`, or `enumerate: combo-grid`) |
+| POST | `/jobs/:id/run` | Drain pending items |
+| GET | `/items` | `?status=&job_id=&template=&limit=` |
+| POST | `/items/:id/{approve,reject,edit,publish,regen}` | Regen capped at 3 |
+
+`prose-generate` also accepts `{ dry_run, template, input_data }` (service-role only).
 
 ---
 

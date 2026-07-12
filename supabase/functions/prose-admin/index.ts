@@ -10,7 +10,7 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
-const ITEM_COLS = 'id, site_id, job_id, template_key, template_version, item_key, status, input_data, output, edited_output, validation, similarity';
+const ITEM_COLS = 'id, site_id, job_id, template_key, template_version, item_key, status, input_data, output, edited_output, validation, similarity, regen_count';
 
 const deps: AdminDeps = {
   async getUserId(jwt) {
@@ -43,6 +43,32 @@ const deps: AdminDeps = {
       .eq('site_id', siteId).eq('key', key).eq('version', version).maybeSingle();
     if (error) throw error;
     return data;
+  },
+  async listTemplates(siteId) {
+    const { data, error } = await supabase.from('prose_templates')
+      .select('id, key, version, name, model, created_at')
+      .eq('site_id', siteId)
+      .order('key').order('version', { ascending: false });
+    if (error) throw error;
+    return data ?? [];
+  },
+  async getTemplateFull(siteId, key, version) {
+    const { data, error } = await supabase.from('prose_templates')
+      .select('*')
+      .eq('site_id', siteId).eq('key', key).eq('version', version).maybeSingle();
+    if (error) throw error;
+    return data;
+  },
+  async invokeDryRun(_siteId, template, inputData, itemKey) {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/prose-generate`, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ dry_run: true, template, input_data: inputData, item_key: itemKey }),
+    });
+    return await res.json();
   },
   async insertTemplate(siteId, userId, row) {
     const { data, error } = await supabase.from('prose_templates').insert({
@@ -107,7 +133,7 @@ const deps: AdminDeps = {
 
   async getJob(siteId, jobId) {
     const { data, error } = await supabase.from('prose_jobs')
-      .select('id, site_id, template_id, status, mode, review_sample_pct')
+      .select('id, site_id, template_id, status, mode, review_sample_pct, item_count, tokens_in, tokens_out, created_at, finished_at, prose_templates ( key, version )')
       .eq('site_id', siteId).eq('id', jobId).maybeSingle();
     if (error) throw error;
     return data;

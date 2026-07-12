@@ -10,6 +10,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { createClient } from '@supabase/supabase-js';
 import {
+  dryRunTemplate,
   generateItem,
   type GenerateDeps,
   type ItemRow,
@@ -111,12 +112,36 @@ Deno.serve(async (req: Request) => {
   const bearer = (req.headers.get('authorization') ?? '').replace(/^Bearer\s+/i, '');
   if (!SERVICE_ROLE_KEY || bearer !== SERVICE_ROLE_KEY) return json({ ok: false, error: 'forbidden' }, 403);
 
-  let body: { item_id?: string; mode?: 'generate' | 'regenerate' };
+  let body: {
+    item_id?: string;
+    mode?: 'generate' | 'regenerate';
+    dry_run?: boolean;
+    template?: TemplateRow;
+    input_data?: Record<string, unknown>;
+    item_key?: string;
+  };
   try {
     body = await req.json();
   } catch {
     return json({ ok: false, error: 'invalid JSON body' }, 400);
   }
+
+  if (body.dry_run) {
+    if (!body.template || !body.input_data || typeof body.input_data !== 'object') {
+      return json({ ok: false, error: 'dry_run requires template and input_data' }, 400);
+    }
+    try {
+      const result = await dryRunTemplate(deps, {
+        template: body.template,
+        input_data: body.input_data,
+        item_key: body.item_key,
+      });
+      return json(result, result.ok ? 200 : 422);
+    } catch (err) {
+      return json({ ok: false, error: String(err instanceof Error ? err.message : err) }, 500);
+    }
+  }
+
   if (!body.item_id) return json({ ok: false, error: 'item_id required' }, 400);
 
   try {

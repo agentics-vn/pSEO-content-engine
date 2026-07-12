@@ -356,6 +356,12 @@ export interface GenerateRequest {
   mode?: 'generate' | 'regenerate';
 }
 
+export interface DryRunRequest {
+  template: TemplateRow;
+  input_data: Record<string, unknown>;
+  item_key?: string;
+}
+
 /**
  * Assemble the per-item gate results for an output against a template + its
  * input_data: schema, the generic per-item gates over resolved guards, and
@@ -469,4 +475,59 @@ export async function generateItem(deps: GenerateDeps, req: GenerateRequest): Pr
   });
 
   return { ok: true, status, cached: false, item_key: item.item_key, gates };
+}
+
+/**
+ * Dry-run: build prompt, call LLM, run per-item gates — no DB writes.
+ * Used by Template Studio test panel via prose-admin proxy.
+ */
+export async function dryRunTemplate(
+  deps: Pick<GenerateDeps, 'llm'>,
+  req: DryRunRequest,
+): Promise<{
+  ok: boolean;
+  output?: Record<string, unknown>;
+  gates?: GateResult[];
+  tokens_in?: number;
+  tokens_out?: number;
+  error?: string;
+}> {
+  const template = req.template;
+  const itemKey = req.item_key ?? 'dry-run';
+  const notes = constraintNotes(template.output_schema, template.guards);
+  const withNotes = template.user_template.includes('{constraint_notes}')
+    ? template.user_template.replace('{constraint_notes}', notes)
+    : `${template.user_template}\n\n${notes}`;
+  const userPrompt = fillTemplate(withNotes, req.input_data);
+
+  let system = template.system_prompt;
+  const fewShots = (template.few_shots ?? []).filter(
+    (shot) => !(shot && typeof shot === 'object' && (shot as { item_key?: string }).item_key === itemKey),
+  );
+  if (fewShots.length > 0) {
+    system += '\n\nVÍ DỤ THAM KHẢO (giọng văn & cấu trúc — KHÔNG chép lại nội dung, dữ kiện thuộc về tổ hợp khác):\n' +
+      fewShots.map((s, i) => `--- Ví dụ ${i + 1} ---\n${JSON.stringify((s as { output?: unknown }).output ?? s)}`).join('\n');
+  }
+
+  try {
+    const llmResult = await deps.llm({
+      model: template.model,
+      system,
+      userPrompt,
+      toolSchema: stripForStrict(template.output_schema) as Record<string, unknown>,
+      temperature: template.temperature,
+      maxTokens: template.max_tokens,
+    });
+    const output = coerceToSchema(llmResult.output, template.output_schema) as Record<string, unknown>;
+    const gates = assembleItemGates(output, template, req.input_data);
+    return {
+      ok: true,
+      output,
+      gates,
+      tokens_in: llmResult.tokensIn,
+      tokens_out: llmResult.tokensOut,
+    };
+  } catch (err) {
+    return { ok: false, error: String(err instanceof Error ? err.message : err) };
+  }
 }

@@ -15,7 +15,11 @@ interface World {
   metrics: Array<{ item_key: string; clicks: number; impressions: number; avg_position: number | null; conversions: number; revenue: number }>;
   items: Map<string, AdminItemRow & { data_hash: string }>;
   jobs: Map<string, { id: string; site_id: string; template_id: string; status: string; mode: string; review_sample_pct: number }>;
-  templates: Map<string, { id: string; site_id: string; key: string; version: number; guards: Record<string, unknown>; output_schema: Record<string, unknown> }>;
+  templates: Map<string, {
+    id: string; site_id: string; key: string; version: number; name: string; model: string;
+    created_at: string; guards: Record<string, unknown>; output_schema: Record<string, unknown>;
+    system_prompt: string; user_template: string; few_shots: unknown[]; temperature: number; max_tokens: number;
+  }>;
   webhookCalls: Array<{ url: string; payload: unknown }>;
   generateCalls: string[];
 }
@@ -32,7 +36,10 @@ function makeWorld(role: string = 'reviewer'): World {
 
   templates.set('tpl-1', {
     id: 'tpl-1', site_id: 'site-1', key: 'combo-so-chu-dao-su-menh', version: 1,
+    name: 'Combo', model: 'claude-haiku-4-5', created_at: '2026-01-01T00:00:00Z',
     output_schema: { type: 'object' },
+    system_prompt: 'sys', user_template: 'user {{json data}}', few_shots: [],
+    temperature: 0.7, max_tokens: 2600,
     guards: {
       banned_phrases: { severity: 'fail', list: ['cấm'] },
       similarity: { severity: 'flag', max_pairwise: 0.55 },
@@ -51,9 +58,28 @@ function makeWorld(role: string = 'reviewer'): World {
     },
     getTemplate: (siteId, key, version) =>
       Promise.resolve([...templates.values()].find((t) => t.site_id === siteId && t.key === key && t.version === version) ?? null),
+    listTemplates: (siteId) =>
+      Promise.resolve([...templates.values()]
+        .filter((t) => t.site_id === siteId)
+        .map((t) => ({ id: t.id, key: t.key, version: t.version, name: t.name, model: t.model, created_at: t.created_at }))),
+    getTemplateFull: (siteId, key, version) => {
+      const t = [...templates.values()].find((x) => x.site_id === siteId && x.key === key && x.version === version);
+      return Promise.resolve(t ? { ...t } : null);
+    },
+    invokeDryRun: () => Promise.resolve({
+      ok: true, output: { intro: 'dry' },
+      gates: [{ gate: 'schema', severity: 'fail', passed: true }],
+      tokens_in: 100, tokens_out: 200,
+    }),
     insertTemplate: (siteId, _userId, row) => {
       const id = uid();
-      templates.set(id, { id, site_id: siteId, key: row.key, version: row.version, guards: row.guards ?? {}, output_schema: row.output_schema ?? { type: 'object' } });
+      templates.set(id, {
+        id, site_id: siteId, key: row.key, version: row.version,
+        name: row.name, model: row.model, created_at: new Date().toISOString(),
+        guards: row.guards ?? {}, output_schema: row.output_schema ?? { type: 'object' },
+        system_prompt: row.system_prompt, user_template: row.user_template,
+        few_shots: row.few_shots ?? [], temperature: row.temperature ?? 0.7, max_tokens: row.max_tokens ?? 2600,
+      });
       return Promise.resolve({ id, version: row.version });
     },
 
@@ -77,7 +103,7 @@ function makeWorld(role: string = 'reviewer'): World {
         items.set(id, {
           id, site_id: r.site_id, job_id: r.job_id, template_key: r.template_key,
           template_version: r.template_version, item_key: r.item_key, status: r.status,
-          output: null, edited_output: null, validation: {}, similarity: null,
+          output: null, edited_output: null, validation: {}, similarity: null, regen_count: 0,
           input_data: r.input_data as Record<string, unknown>, data_hash: r.data_hash,
         });
         inserted++;
@@ -135,15 +161,18 @@ function makeWorld(role: string = 'reviewer'): World {
     },
 
     // Fake prose-generate: writes a distinct clean output per item.
-    generate: (itemId) => {
+    generate: (itemId, mode) => {
       generateCalls.push(itemId);
       const it = items.get(itemId)!;
-      if (it.status !== 'pending') return Promise.resolve({ ok: true, status: it.status, cached: true });
+      if (it.status !== 'pending' && mode !== 'regenerate') {
+        return Promise.resolve({ ok: true, status: it.status, cached: true });
+      }
       it.output = {
         intro: `Bài viết riêng cho ${it.item_key}: ${it.item_key.split('').reverse().join(' ')}`,
         faqs: [{ q: 'q', a: 'a' }],
       };
       it.status = 'generated';
+      if (mode === 'regenerate') it.regen_count = (it.regen_count ?? 0) + 1;
       it.validation = { gates: [{ gate: 'schema', severity: 'fail', passed: true }] };
       return Promise.resolve({ ok: true, status: 'generated' });
     },
@@ -200,6 +229,7 @@ async function seedItem(w: World, over: Partial<AdminItemRow> = {}): Promise<str
     output: { intro: 'nội dung' }, edited_output: null,
     validation: { gates: [{ gate: 'schema', severity: 'fail', passed: true }] },
     similarity: null, input_data: input as unknown as Record<string, unknown>, data_hash: await dataHash(input),
+    regen_count: 0,
     ...over,
   });
   return id;
@@ -578,4 +608,39 @@ Deno.test('GET /items?status=flagged returns only flagged items for the caller s
   const body = await res.json();
   assertEquals(body.items.length, 1);
   assertEquals(body.items[0].status, 'flagged');
+});
+
+Deno.test('GET /templates lists site templates', async () => {
+  const w = makeWorld();
+  const res = await call(w.deps, 'GET', '/templates');
+  const body = await res.json();
+  assertEquals(res.status, 200);
+  assertEquals(body.templates.length, 1);
+  assertEquals(body.templates[0].key, 'combo-so-chu-dao-su-menh');
+});
+
+Deno.test('GET /templates/:key returns full template row', async () => {
+  const w = makeWorld();
+  const res = await call(w.deps, 'GET', '/templates/combo-so-chu-dao-su-menh');
+  const body = await res.json();
+  assertEquals(res.status, 200);
+  assertEquals(body.template.key, 'combo-so-chu-dao-su-menh');
+  assert(body.template.system_prompt);
+});
+
+Deno.test('POST /items/:id/regen refuses after 3 regens', async () => {
+  const w = makeWorld();
+  const id = await seedItem(w, { status: 'flagged', regen_count: 3 });
+  const res = await call(w.deps, 'POST', `/items/${id}/regen`, {});
+  assertEquals(res.status, 409);
+});
+
+Deno.test('OPTIONS preflight returns 204 with CORS', async () => {
+  const w = makeWorld();
+  const res = await makeAdminHandler(w.deps)(new Request('http://local/prose-admin/stats', {
+    method: 'OPTIONS',
+    headers: { origin: 'https://pseo-content-engine.fly.dev' },
+  }));
+  assertEquals(res.status, 204);
+  assert(res.headers.get('access-control-allow-origin'));
 });

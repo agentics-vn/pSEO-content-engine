@@ -1,15 +1,20 @@
 /**
- * RemoteSource — the single data source: speaks to prose-admin with a Supabase
- * user JWT. There is no mock/demo source; the admin UI always shows live
- * engine data.
- *
- * Engine endpoint (URL / anon key / prose-admin) is baked at build time via
- * VITE_* — one engine DB serves every tenant site. Login only collects
- * credentials + which site to operate on.
+ * RemoteSource — speaks to prose-admin with a Supabase user JWT.
+ * Engine endpoint is baked at build time via VITE_*.
  */
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import type { DashboardData, DataSource, MetricsSummary } from './types';
+import type {
+  ApiResult,
+  CreateJobInput,
+  DashboardData,
+  DataSource,
+  JobRow,
+  MetricsSummary,
+  ReviewItem,
+  TemplateFull,
+  TemplateRow,
+} from './types';
 
 export interface EngineConfig {
   supabaseUrl: string;
@@ -27,7 +32,6 @@ export type RemoteConfig = EngineConfig & LoginCredentials;
 
 const CONFIG_KEY = 'pseo-admin-config';
 
-/** Baked-in engine project. Required at build time for production. */
 export function engineConfig(): EngineConfig {
   const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL ?? '').replace(/\/$/, '');
   const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY ?? '';
@@ -57,12 +61,32 @@ export function savedCredentials(): Omit<LoginCredentials, 'password'> | null {
   }
 }
 
+function mapJob(j: Record<string, unknown>): JobRow {
+  const tpl = j.prose_templates as { key?: string } | null;
+  return {
+    id: j.id as string,
+    status: j.status as string,
+    mode: j.mode as string,
+    item_count: Number(j.item_count ?? 0),
+    tokens_in: Number(j.tokens_in ?? 0),
+    tokens_out: Number(j.tokens_out ?? 0),
+    created_at: j.created_at as string,
+    finished_at: (j.finished_at as string | null) ?? null,
+    template: tpl?.key,
+    review_sample_pct: j.review_sample_pct as number | undefined,
+  };
+}
+
 export class RemoteSource implements DataSource {
   private supabase: SupabaseClient;
   private token = '';
+  readonly siteSlug: string;
+  readonly adminName: string;
 
   constructor(private cfg: RemoteConfig) {
     this.supabase = createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
+    this.siteSlug = cfg.siteSlug;
+    this.adminName = cfg.email.split('@')[0];
   }
 
   async signIn(): Promise<void> {
@@ -78,7 +102,11 @@ export class RemoteSource implements DataSource {
     );
   }
 
-  private async call(method: string, path: string, body?: unknown): Promise<any> {
+  private async call<T extends ApiResult = ApiResult>(
+    method: string,
+    path: string,
+    body?: unknown,
+  ): Promise<T> {
     const res = await fetch(`${this.cfg.adminApiUrl}${path}`, {
       method,
       headers: {
@@ -89,16 +117,12 @@ export class RemoteSource implements DataSource {
       },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
-    const json = await res.json().catch(() => ({}));
-    if (!res.ok) return { ok: false, error: json.error ?? `HTTP ${res.status}`, ...json };
-    return { ok: true, ...json };
+    const json = (await res.json().catch(() => ({}))) as Record<string, unknown> & { error?: string };
+    if (!res.ok) return { ...json, ok: false, error: String(json.error ?? `HTTP ${res.status}`) } as T;
+    return { ...json, ok: true } as T;
   }
 
   async load(): Promise<DashboardData> {
-    // The actionable queue is every item awaiting a human decision: flagged
-    // (needs review), generated (clean, needs approve+publish), and approved
-    // (needs publish). Fetching only `flagged` stranded clean items AND made
-    // Publish unreachable — an approved item dropped off the list on reload.
     const [stats, jobs, flagged, generated, approved] = await Promise.all([
       this.call('GET', '/stats'),
       this.call('GET', '/jobs?limit=30'),
@@ -108,29 +132,71 @@ export class RemoteSource implements DataSource {
     ]);
     return {
       siteSlug: this.cfg.siteSlug,
-      adminName: this.cfg.email.split('@')[0],
-      // Guard: a transient /stats failure must not white-screen the dashboard.
+      adminName: this.adminName,
       stats: stats.ok
-        ? stats
+        ? (stats as unknown as DashboardData['stats'])
         : { items_by_status: {}, published_total: 0, tokens_in: 0, tokens_out: 0 },
-      jobs: jobs.jobs ?? [],
-      review: [...(flagged.items ?? []), ...(approved.items ?? []), ...(generated.items ?? [])],
+      jobs: (jobs.jobs as Record<string, unknown>[] ?? []).map(mapJob),
+      review: [
+        ...((flagged.items as ReviewItem[]) ?? []),
+        ...((approved.items as ReviewItem[]) ?? []),
+        ...((generated.items as ReviewItem[]) ?? []),
+      ],
     };
   }
 
   metrics = async (): Promise<MetricsSummary | null> => {
     const res = await this.call('GET', '/metrics?window=28');
-    return res.ok && res.items?.length ? res : null;
+    return res.ok && (res.items as unknown[])?.length ? (res as unknown as MetricsSummary) : null;
   };
+
+  listTemplates = async (): Promise<TemplateRow[]> => {
+    const res = await this.call('GET', '/templates');
+    return res.ok ? (res.templates as TemplateRow[]) ?? [] : [];
+  };
+
+  getTemplate = async (key: string, version?: number): Promise<TemplateFull | null> => {
+    const q = version ? `?version=${version}` : '';
+    const res = await this.call('GET', `/templates/${encodeURIComponent(key)}${q}`);
+    return res.ok ? (res.template as TemplateFull) : null;
+  };
+
+  createTemplate = (row: Omit<TemplateFull, 'id' | 'version' | 'created_at'> & { version?: number }) =>
+    this.call('POST', '/templates', row);
+
+  testTemplate = (key: string, inputData: Record<string, unknown>, version?: number, itemKey?: string) =>
+    this.call('POST', '/templates/test', { key, version, input_data: inputData, item_key: itemKey });
+
+  listJobs = async (limit = 30): Promise<JobRow[]> => {
+    const res = await this.call('GET', `/jobs?limit=${limit}`);
+    return res.ok ? ((res as ApiResult & { jobs?: Record<string, unknown>[] }).jobs ?? []).map(mapJob) : [];
+  };
+
+  getJob = async (id: string): Promise<JobRow | null> => {
+    const res = await this.call<ApiResult & { job?: Record<string, unknown> }>('GET', `/jobs/${id}`);
+    return res.ok && res.job ? mapJob(res.job) : null;
+  };
+
+  createJob = (input: CreateJobInput) =>
+    this.call<ApiResult & { job_id?: string; item_count?: number }>('POST', '/jobs', input);
+
+  runJob = (id: string) =>
+    this.call<ApiResult & { remaining?: number; processed?: number }>('POST', `/jobs/${id}/run`);
+
+  listItems = async (filter: { status?: string; job_id?: string; template?: string; limit?: number }) => {
+    const params = new URLSearchParams();
+    if (filter.status) params.set('status', filter.status);
+    if (filter.job_id) params.set('job_id', filter.job_id);
+    if (filter.template) params.set('template', filter.template);
+    params.set('limit', String(filter.limit ?? 100));
+    const res = await this.call('GET', `/items?${params}`);
+    return res.ok ? ((res.items as ReviewItem[]) ?? []) : [];
+  };
+
   approve = (id: string) => this.call('POST', `/items/${id}/approve`);
-  reject = (id: string) => this.call('POST', `/items/${id}/reject`, {});
+  reject = (id: string, note?: string) => this.call('POST', `/items/${id}/reject`, { review_note: note });
   publish = (id: string) => this.call('POST', `/items/${id}/publish`);
-  createJob = (input: { template_key: string; master: 'exclude' | 'only' | 'all'; review_sample_pct: number }) =>
-    this.call('POST', '/jobs', {
-      template_key: input.template_key,
-      enumerate: 'combo-grid',
-      ...(input.master === 'all' ? {} : { filter: { master: input.master } }),
-      review_sample_pct: input.review_sample_pct,
-    });
-  runJob = (id: string) => this.call('POST', `/jobs/${id}/run`);
+  edit = (id: string, editedOutput: Record<string, unknown>) =>
+    this.call('POST', `/items/${id}/edit`, { edited_output: editedOutput });
+  regen = (id: string, note?: string) => this.call('POST', `/items/${id}/regen`, { review_note: note });
 }

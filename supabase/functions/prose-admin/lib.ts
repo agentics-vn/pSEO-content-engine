@@ -112,6 +112,7 @@ export interface AdminItemRow {
     review_sampled?: boolean;
   };
   similarity: number | null;
+  regen_count?: number;
 }
 
 export interface AdminDeps {
@@ -124,7 +125,15 @@ export interface AdminDeps {
     | { id: string; key: string; version: number; guards: Record<string, unknown>; output_schema: Record<string, unknown> }
     | null
   >;
+  listTemplates(siteId: string): Promise<Array<{
+    id: string; key: string; version: number; name: string; model: string; created_at: string;
+  }>>;
+  getTemplateFull(siteId: string, key: string, version: number): Promise<Record<string, unknown> | null>;
   insertTemplate(siteId: string, userId: string, row: TemplateInput & { version: number }): Promise<{ id: string; version: number }>;
+  invokeDryRun(siteId: string, template: Record<string, unknown>, inputData: Record<string, unknown>, itemKey?: string): Promise<{
+    ok: boolean; output?: Record<string, unknown>; gates?: GateResult[];
+    tokens_in?: number; tokens_out?: number; error?: string;
+  }>;
 
   getPublishedItemKeys(siteId: string, templateKey: string): Promise<Set<string>>;
   insertJob(row: {
@@ -148,7 +157,7 @@ export interface AdminDeps {
   ): Promise<{ reset: string[]; published: string[] }>;
 
   getJob(siteId: string, jobId: string): Promise<
-    | { id: string; site_id: string; template_id: string; status: string; mode: string; review_sample_pct: number }
+    | { id: string; site_id: string; template_id: string; status: string; mode: string; review_sample_pct: number; item_count?: number; tokens_in?: number; tokens_out?: number; created_at?: string; finished_at?: string | null }
     | null
   >;
   getTemplateById(templateId: string): Promise<{ key: string; version: number; guards: Record<string, unknown> } | null>;
@@ -246,6 +255,41 @@ export function makeAdminHandler(deps: AdminDeps, opts: { runBudgetMs?: number }
       const isWrite = req.method === 'POST';
       if (isWrite && !atLeast(site.role, 'editor')) {
         return reply({ error: `role "${site.role}" cannot modify the pipeline` }, 403);
+      }
+
+      // ── GET /templates — list site templates ─────────────────────────────
+      if (req.method === 'GET' && path === '/templates') {
+        const templates = await deps.listTemplates(site.site_id);
+        return reply({ ok: true, templates });
+      }
+
+      const templateKeyMatch = path.match(/^\/templates\/([^/]+)$/);
+      if (req.method === 'GET' && templateKeyMatch) {
+        const key = decodeURIComponent(templateKeyMatch[1]);
+        const versionParam = url.searchParams.get('version');
+        const version = versionParam
+          ? Number(versionParam)
+          : await deps.getLatestTemplateVersion(site.site_id, key);
+        if (version === null || !Number.isFinite(version)) {
+          return reply({ error: `no template "${key}"` }, 404);
+        }
+        const tpl = await deps.getTemplateFull(site.site_id, key, version);
+        if (!tpl) return reply({ error: `no template "${key}" v${version}` }, 404);
+        return reply({ ok: true, template: tpl });
+      }
+
+      // ── POST /templates/test — dry-run without persisting ────────────────
+      if (req.method === 'POST' && path === '/templates/test') {
+        const t = await body<{ key: string; version?: number; input_data: Record<string, unknown>; item_key?: string }>();
+        if (!t.key || !t.input_data || typeof t.input_data !== 'object') {
+          return reply({ error: 'key and input_data required' }, 400);
+        }
+        const version = t.version ?? (await deps.getLatestTemplateVersion(site.site_id, t.key));
+        if (version === null) return reply({ error: `no template "${t.key}"` }, 404);
+        const tpl = await deps.getTemplateFull(site.site_id, t.key, version);
+        if (!tpl) return reply({ error: `no template "${t.key}" v${version}` }, 404);
+        const result = await deps.invokeDryRun(site.site_id, tpl, t.input_data, t.item_key);
+        return reply(result, result.ok ? 200 : 422);
       }
 
       // ── POST /templates — create/version (immutable per version) ─────────
@@ -437,7 +481,13 @@ export function makeAdminHandler(deps: AdminDeps, opts: { runBudgetMs?: number }
         return reply({ ok: true, processed, remaining, batch_gates_ran: batchGatesRan, failures });
       }
 
-      // ── GET /jobs, GET /stats — dashboard reads ──────────────────────────
+      // ── GET /jobs/{id}, GET /jobs — dashboard reads ──────────────────────
+      const jobGet = path.match(/^\/jobs\/([0-9a-f-]+)$/);
+      if (req.method === 'GET' && jobGet) {
+        const job = await deps.getJob(site.site_id, jobGet[1]);
+        if (!job) return reply({ error: 'job not found' }, 404);
+        return reply({ ok: true, job });
+      }
       if (req.method === 'GET' && path === '/jobs') {
         const jobs = await deps.listJobs(site.site_id, Number(url.searchParams.get('limit') ?? 20));
         return reply({ ok: true, jobs });
@@ -483,6 +533,26 @@ export function makeAdminHandler(deps: AdminDeps, opts: { runBudgetMs?: number }
       }
 
       // ── Per-item actions ─────────────────────────────────────────────────
+      const regenMatch = path.match(/^\/items\/([0-9a-f-]+)\/regen$/);
+      if (req.method === 'POST' && regenMatch) {
+        if (!atLeast(site.role, 'reviewer')) {
+          return reply({ error: `role "${site.role}" cannot regen items` }, 403);
+        }
+        const itemId = regenMatch[1];
+        const item = await deps.getItem(site.site_id, itemId);
+        if (!item) return reply({ error: 'item not found' }, 404);
+        if (item.status === 'published') return reply({ error: 'published items are immutable' }, 409);
+        const regenCount = item.regen_count ?? 0;
+        if (regenCount >= 3) return reply({ error: 'regen limit reached (max 3)' }, 409);
+        const note = (await req.json().catch(() => ({}))) as { review_note?: string };
+        const patch: Record<string, unknown> = { status: 'pending' };
+        if (note.review_note) patch.review_note = note.review_note;
+        await deps.updateItem(itemId, patch);
+        const res = await deps.generate(itemId, 'regenerate');
+        if (!res.ok) return reply({ error: res.error ?? 'regen failed' }, 422);
+        return reply({ ok: true, status: res.status, regen_count: regenCount + 1 });
+      }
+
       const action = path.match(/^\/items\/([0-9a-f-]+)\/(approve|reject|publish|edit)$/);
       if (req.method === 'POST' && action) {
         const [, itemId, verb] = action;
