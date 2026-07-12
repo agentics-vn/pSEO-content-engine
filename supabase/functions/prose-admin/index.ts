@@ -133,7 +133,7 @@ const deps: AdminDeps = {
 
   async getJob(siteId, jobId) {
     const { data, error } = await supabase.from('prose_jobs')
-      .select('id, site_id, template_id, status, mode, review_sample_pct, item_count, tokens_in, tokens_out, tokens_in_batch, tokens_out_batch, tokens_in_sync, tokens_out_sync, created_at, finished_at, anthropic_batch_id, batch_status, run_channel, prose_templates ( key, version, model )')
+      .select('id, site_id, template_id, status, mode, review_sample_pct, item_count, tokens_in, tokens_out, tokens_in_batch, tokens_out_batch, tokens_in_sync, tokens_out_sync, created_at, finished_at, status_updated_at, anthropic_batch_id, batch_status, run_channel, prose_templates ( key, version, model )')
       .eq('site_id', siteId).eq('id', jobId).maybeSingle();
     if (error) throw error;
     return data;
@@ -286,7 +286,7 @@ const deps: AdminDeps = {
 
   async listJobs(siteId, limit) {
     const { data, error } = await supabase.from('prose_jobs')
-      .select('id, status, mode, item_count, review_sample_pct, tokens_in, tokens_out, tokens_in_batch, tokens_out_batch, tokens_in_sync, tokens_out_sync, created_at, finished_at, anthropic_batch_id, batch_status, run_channel, prose_templates ( key, version, model )')
+      .select('id, status, mode, item_count, review_sample_pct, tokens_in, tokens_out, tokens_in_batch, tokens_out_batch, tokens_in_sync, tokens_out_sync, created_at, finished_at, status_updated_at, anthropic_batch_id, batch_status, run_channel, prose_templates ( key, version, model )')
       .eq('site_id', siteId).order('created_at', { ascending: false }).limit(limit);
     if (error) throw error;
     return data ?? [];

@@ -68,6 +68,19 @@ export function fmtUsd(n: number): string {
   return `$${n.toFixed(2)}`;
 }
 
+/** Compact timestamp for job status changes. */
+export function fmtJobDate(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
 /** Item-level actual cost using usage_channel when set. */
 export function itemActualCostUsd(
   item: Pick<ReviewItem, 'tokens_in' | 'tokens_out' | 'usage_channel'>,

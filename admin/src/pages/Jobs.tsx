@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { CreateJobInput, DataSource, JobRow, TemplateRow } from '../types';
 import { countComboGrid } from '../lib/comboGrid';
-import { estimateJobCost, jobActualCostUsd, fmtUsd, batchStatusLabel } from '../lib/format';
+import { estimateJobCost, jobActualCostUsd, fmtUsd, fmtJobDate, batchStatusLabel } from '../lib/format';
 import { latestPerKey } from '../lib/templates';
 import { drainJob } from '../lib/runJob';
 import { navigate } from '../router';
@@ -169,6 +169,7 @@ export function JobsPage({
               <th>Job</th>
               <th>Template</th>
               <th>Status</th>
+              <th>Updated</th>
               <th>Items</th>
               <th>Actual cost</th>
               <th />
@@ -185,6 +186,9 @@ export function JobsPage({
                     <span className="st st-flagged" style={{ marginLeft: 6 }}>{batchStatusLabel(j)}</span>
                   )}
                 </td>
+                <td className="meta" title={j.status_updated_at ?? j.created_at}>
+                  {fmtJobDate(j.status_updated_at ?? j.finished_at ?? j.created_at)}
+                </td>
                 <td>{j.item_count}</td>
                 <td className="cost" title={`${j.tokens_in} in / ${j.tokens_out} out`}>
                   {fmtUsd(jobActualCostUsd(j))}
@@ -200,7 +204,7 @@ export function JobsPage({
               </tr>
             ))}
             {jobs.length === 0 && (
-              <tr><td colSpan={6} className="empty">No jobs — create one above.</td></tr>
+              <tr><td colSpan={7} className="empty">No jobs — create one above.</td></tr>
             )}
           </tbody>
         </table>

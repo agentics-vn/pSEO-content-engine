@@ -36,6 +36,7 @@ export interface JobRow {
   tokens_out_sync?: number;
   created_at: string;
   finished_at: string | null;
+  status_updated_at?: string;
   template?: string;
   model?: string;
   review_sample_pct?: number;

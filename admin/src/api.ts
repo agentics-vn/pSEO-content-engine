@@ -76,6 +76,7 @@ function mapJob(j: Record<string, unknown>): JobRow {
     tokens_out_sync: Number(j.tokens_out_sync ?? 0),
     created_at: j.created_at as string,
     finished_at: (j.finished_at as string | null) ?? null,
+    status_updated_at: (j.status_updated_at as string | undefined) ?? (j.created_at as string),
     template: tpl?.key,
     model: tpl?.model,
     review_sample_pct: j.review_sample_pct as number | undefined,
