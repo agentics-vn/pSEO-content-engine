@@ -39,6 +39,24 @@ Deno.test('gateLength counts code points and trips out-of-bounds fields', () => 
   assertEquals(gateLength(baseCtx({ output: {}, guards })).passed, false); // missing = violation
 });
 
+Deno.test('gateLength hard-fails under-min/missing, soft-flags over-max', () => {
+  const guards = { length: { fields: { intro: [5, 10] } } };
+  // under min → blocking fail
+  const under = gateLength(baseCtx({ output: { intro: 'ngắn' }, guards }));
+  assertEquals(under.passed, false);
+  assertEquals(under.severity, 'fail');
+  // missing field → blocking fail
+  assertEquals(gateLength(baseCtx({ output: {}, guards })).severity, 'fail');
+  // over max only → non-blocking flag (overshoot surfaces to review, never blocks approve)
+  const over = gateLength(baseCtx({ output: { intro: 'mười một kýy' }, guards })); // 12 code points > 10
+  assertEquals(over.passed, false);
+  assertEquals(over.severity, 'flag');
+  // a mix of over-max and under-min stays a hard fail
+  const mixGuards = { length: { fields: { a: [5, 10], b: [5, 10] } } };
+  const mix = gateLength(baseCtx({ output: { a: 'quá dài mười hai', b: 'ít' }, guards: mixGuards }));
+  assertEquals(mix.severity, 'fail');
+});
+
 Deno.test('gateLength bounds array elements via field.N (ngaylanhthangtot)', () => {
   const guards = { length: { fields: { 'phanTich.0': [3, 10], 'phanTich.1': [3, 10] } } };
   assert(gateLength(baseCtx({ output: { phanTich: ['bốn từ', 'sáu ký tự'] }, guards })).passed); // 6 & 9 ∈ [3,10]

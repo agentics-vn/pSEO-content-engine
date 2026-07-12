@@ -49,17 +49,30 @@ function resolveLengthTarget(output: Record<string, unknown>, field: string): un
   return cur;
 }
 
+/**
+ * length: bound each field's code-point count. Under-min and missing are hard
+ * FAILS (thin or absent content is a real defect that blocks approve). Over-max
+ * is a soft FLAG — non-blocking overflow that still surfaces to review: a body
+ * paragraph 21 chars long is harmless, but a `metaDescription`/`seoTitle` past
+ * its SERP-truncation limit is worth a human trim. So the gate only hard-fails
+ * when at least one under-min/missing violation exists; a purely over-max result
+ * is downgraded to 'flag'. A template can still force uniform severity via
+ * guards.length.severity (applied in runItemGates).
+ */
 export function gateLength(ctx: GateContext): GateResult {
   const fields = ctx.guards.length?.fields ?? {};
-  const viol: string[] = [];
+  const hard: string[] = []; // missing or under-min — blocks approve
+  const soft: string[] = []; // over-max — flagged for review, non-blocking
   for (const [field, bounds] of Object.entries<[number, number]>(fields)) {
     const val = resolveLengthTarget(ctx.output, field);
-    if (typeof val !== 'string') { viol.push(`${field}: missing`); continue; }
+    if (typeof val !== 'string') { hard.push(`${field}: missing`); continue; }
     const len = [...val].length; // code points, correct for Vietnamese
-    if (len < bounds[0] || len > bounds[1]) viol.push(`${field}: ${len}∉[${bounds}]`);
+    if (len < bounds[0]) hard.push(`${field}: ${len}<${bounds[0]}`);
+    else if (len > bounds[1]) soft.push(`${field}: ${len}>${bounds[1]}`);
   }
-  return { gate: 'length', severity: 'fail', passed: viol.length === 0,
-           detail: viol.join('; ') || undefined };
+  const viol = [...hard, ...soft];
+  return { gate: 'length', severity: hard.length > 0 ? 'fail' : 'flag',
+           passed: viol.length === 0, detail: viol.join('; ') || undefined };
 }
 
 /**
