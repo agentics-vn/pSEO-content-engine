@@ -36,6 +36,42 @@ You produce A. You hand the `seeds/<client>/` folder back to the human, who drop
 it into the engine repo and runs the validator. If your folder follows `01`, the
 validator passes and generation runs without surprises.
 
+## Working across the two repos — what you give, what you get back
+
+This is a **two-repo, HTTP-only** setup. The engine never touches this repo's code
+or database; you never touch the engine's. Work crosses the boundary as a few
+explicit handoffs — think of them as batons, and note they travel in **different
+directions**:
+
+**1. You → engine (one-time — a folder, not access).**
+When Phase A is done you hand the engine-repo session **one thing**: the
+`seeds/<client>/` folder + a one-line note (see "What to hand back"). You do not
+get, or need, any engine credentials. The engine session drops the folder into
+`seeds/<client>/`, runs `validate-seed` → `load-seed`, generates, and **a human
+reviews and publishes**.
+
+**2. Engine → you (what comes back).**
+- **A site-scoped API key** — printed once by `load-seed`. Read-only, sees only
+  your own tenant. Put it in this repo's build secrets (e.g. `<CLIENT>_CONTENT_KEY`).
+- **Published content** over `content-api`, live the moment the engine publishes:
+  `…/v1/sites/<slug>/published?template=<key>`.
+- **(optional) a webhook** the engine calls on publish, to trigger your rebuild.
+
+**3. You again (Phase C — in this repo).**
+Wire `pull-combos.mjs` (see `example-pull-script.mjs`) into `prebuild` with that
+key → it pulls the published rows into a snapshot JSON → your pages render → the
+build-time drift throw guards it.
+
+**Two timing rules that save a broken build:**
+- Don't enable the `prebuild` pull until the engine has published **at least the
+  golden set** — an empty pull against a declared grid is a red build *by design*.
+- Don't remove any existing content source in this repo until that pull is green.
+
+> The shared math package (`@pseo/numerology-core`) is **owned by the engine
+> repo**. If your pages compute values, *install* it from the org registry and
+> import it — never copy it in (a local fork silently drifts from the engine;
+> that's the A1 rule). Ask the human for install access.
+
 ## Engine facts you need
 
 - **Engine base URL (content-api):**
@@ -148,6 +184,11 @@ put length bounds in guards.length not the schema; user_template carries only
 facts + {constraint_notes}; use claude-sonnet-5 for the golden set. Run the
 self-check in README.md before handing back. If there is no real enumerable
 data axis, refuse and explain — do not invent keyword volumes.
+
+When done, hand back only the seeds/<client>/ folder + a one-line note; in
+return you'll get a site-scoped API key + content-api access for Phase C (see
+"Working across the two repos"). Do NOT enable the prebuild pull or remove any
+existing content source until the engine has published the golden set.
 
 Start by proposing the axis and the hub & spoke map for my review before
 writing any schema.
