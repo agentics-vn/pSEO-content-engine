@@ -1,0 +1,65 @@
+# Auto-deploy Admin UI to Fly.io (pseo-content-engine).
+# Requires repo secret FLY_API_TOKEN (fly tokens create deploy -a pseo-content-engine).
+# VITE_* build args live in admin/fly.toml — no GitHub secrets needed for those.
+
+name: Fly Deploy
+
+on:
+  push:
+    branches:
+      - main
+      - claude/new-session-3c9b8c
+    paths:
+      - 'admin/**'
+      - '.github/workflows/deploy-fly.yml'
+  workflow_dispatch:
+
+jobs:
+  check:
+    name: Gate (CI suite)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with: { node-version: '22', cache: npm, cache-dependency-path: package-lock.json }
+      - run: npm ci
+      - run: npm test -w @pseo/numerology-core
+      - run: npm run typecheck -w @pseo/numerology-core
+
+      - uses: denoland/setup-deno@v2
+        with: { deno-version: v2.x }
+      - run: deno test --allow-read tests/
+        working-directory: supabase/functions
+      - run: deno check prose-generate/index.ts prose-admin/index.ts content-api/index.ts
+        working-directory: supabase/functions
+
+      - uses: actions/setup-node@v4
+        with: { node-version: '22', cache: npm, cache-dependency-path: admin/package-lock.json }
+      - run: npm ci
+        working-directory: admin
+      - run: cp .env.example .env && npm run build
+        working-directory: admin
+
+  deploy:
+    name: Deploy to Fly.io
+    needs: check
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-pseo-content-engine
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - name: Require FLY_API_TOKEN
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          if [ -z "$FLY_API_TOKEN" ]; then
+            echo "::error::GitHub secret FLY_API_TOKEN is empty. Create with: fly tokens create deploy -a pseo-content-engine"
+            exit 1
+          fi
+      - name: Deploy admin
+        run: flyctl deploy ./admin --remote-only
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
