@@ -243,13 +243,13 @@ Deno.test('POST /jobs accepts explicit (item_key, input_data) rows — any verti
   const res = await call(w.deps, 'POST', '/jobs', {
     template_key: 'combo-so-chu-dao-su-menh', // any template; input builder not consulted
     items: [
-      { item_key: 'gia-vang-ha-noi', input_data: { city: 'Hà Nội', price: 8_450_000, unit: 'VND/chỉ' } },
-      { item_key: 'gia-vang-da-nang', input_data: { city: 'Đà Nẵng', price: 8_430_000, unit: 'VND/chỉ' } },
+      { item_key: 'city-ha-noi', input_data: { city: 'Hà Nội', value: 8_450_000, unit: 'VND' } },
+      { item_key: 'city-da-nang', input_data: { city: 'Đà Nẵng', value: 8_430_000, unit: 'VND' } },
     ],
   });
   assertEquals(res.status, 201);
   assertEquals((await res.json()).item_count, 2);
-  const rows = [...w.items.values()].filter((i) => i.item_key.startsWith('gia-vang'));
+  const rows = [...w.items.values()].filter((i) => i.item_key.startsWith('city-'));
   assertEquals(rows.length, 2);
   assertEquals((rows[0].input_data as { city: string }).city, 'Hà Nội');
   assert(rows.every((r) => r.data_hash.length === 64), 'input_data hashed into the cache key');

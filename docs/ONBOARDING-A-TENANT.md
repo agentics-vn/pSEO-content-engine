@@ -39,7 +39,8 @@ engine-shaped data** (a hand-authored `output` row matching the schema, in a
 `*.generated.json` file). That proves the schema is renderable before a
 single token is spent, and it means Seat 2 barely exists as a separate step —
 by the time the engine publishes, the components and pull script are already
-merged. `seeds/_examples/giavang24h/` is a complete reference hand-off.
+merged. The [`phase-a-handoff/`](./phase-a-handoff/) package is the complete
+reference — contract, method, a real example seed, and a kickoff prompt.
 
 ---
 
@@ -100,10 +101,10 @@ One template = one page shape. Fill in:
 
 ```jsonc
 {
-  "template_key": "gia-vang-theo-tinh",
+  "template_key": "<template-key>",
   "items": [
-    { "item_key": "gia-vang-ha-noi",  "input_data": { "city": "Hà Nội",  "price": 8450000, "unit": "VND/chỉ" } },
-    { "item_key": "gia-vang-da-nang", "input_data": { "city": "Đà Nẵng", "price": 8430000, "unit": "VND/chỉ" } }
+    { "item_key": "<slug-1>", "input_data": { "city": "Hà Nội",  "value": 8450000, "unit": "VND" } },
+    { "item_key": "<slug-2>", "input_data": { "city": "Đà Nẵng", "value": 8430000, "unit": "VND" } }
   ],
   "review_sample_pct": 100
 }
