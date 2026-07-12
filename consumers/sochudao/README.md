@@ -21,13 +21,19 @@ it in `prebuild`:
 ```
 
 Build secrets: `ENGINE_URL` (content-api base URL) and `SOCHUMENH_CONTENT_KEY`
-(the read-only key minted by `scripts/load-seed.ts`). Switch the import at the
-top to `@pseo/numerology-core` (sochudao already depends on the shared package).
+(the read-only key minted by `scripts/load-seed.ts`). **No numerology import in
+this script** — it parses the two numbers straight from `item_key` and derives
+the slug literally. `@csessh/sochumenh` is used at *runtime* (visitor → số chủ
+đạo × sứ mệnh), not here. Do **not** import `@pseo/numerology-core`: it is
+intentionally unpublished; the engine mirrors `@csessh/sochumenh` and is
+parity-guarded in CI, so there is no math to re-run site-side.
 
 It writes `astro/src/data/numerology/combos.generated.json` and **throws** on:
 a combo declared in `combo-grid.config.json` missing from the pull (partial
-pulls fail loud — never fewer pages silently), any non-NFC string (unicode
-gate mirror), or slug/fact drift against the shared numerology-core.
+pulls fail loud — never fewer pages silently) or any non-NFC string (unicode
+gate mirror). The deterministic facts (harmony / linking / maturity) come from
+each row's `facts` (engine-computed) and are merged into the content — they are
+**not** recomputed here.
 
 `combo-grid.config.json` declares the expected grid explicitly — phase it with
 the rollout:
@@ -55,12 +61,16 @@ export const COMBO_CONTENT: ComboContent[] = generated.map((g) => ({
 
 No page changes — the `ComboContent` type is preserved.
 
-## 3. Keep the per-page drift throw
+## 3. Per-page structural throw
 
-`[combo].astro` keeps its existing throw: recompute `linking`/`maturity`/
-`harmony` via `@pseo/numerology-core` and assert the prose mentions the same
-numbers. The pull script catches whole-grid problems; the page throw catches
-per-page data/prose drift (e.g. a hand-edited generated JSON).
+`[combo].astro` keeps a **structural** throw: assert the slug equals
+`so-chu-dao-{lifePath}-su-menh-{destiny}` for the two numbers parsed from the
+key, and that `facts.harmony` / `facts.linking` / `facts.maturity` are present.
+It does **not** recompute the numbers — those are engine-computed and delivered
+in `facts`; re-running the math site-side would just reintroduce the fork this
+setup removes. The pull script catches whole-grid problems (missing combos);
+the page throw catches per-row damage (e.g. a hand-edited generated JSON whose
+slug and facts no longer agree).
 
 ## 4. Webhook (optional, after CI endpoint exists)
 
