@@ -322,6 +322,7 @@ export interface ItemRow {
   regen_count: number;
   tokens_in?: number;
   tokens_out?: number;
+  usage_channel?: string | null;
 }
 
 export interface LlmRequest {
@@ -349,8 +350,9 @@ export interface GenerateDeps {
     regen_count: number;
     tokens_in: number;
     tokens_out: number;
+    usage_channel?: 'batch' | 'sync';
   }): Promise<void>;
-  addJobUsage(jobId: string, tokensIn: number, tokensOut: number): Promise<void>;
+  addJobUsage(jobId: string, tokensIn: number, tokensOut: number, channel?: 'batch' | 'sync'): Promise<void>;
   getJobReviewPct(jobId: string): Promise<number>;
   llm(req: LlmRequest): Promise<LlmResult>;
 }
@@ -364,6 +366,79 @@ export interface DryRunRequest {
   template: TemplateRow;
   input_data: Record<string, unknown>;
   item_key?: string;
+}
+
+/**
+ * Build the LLM request for one item: constraint notes, few-shots, strict schema.
+ * Shared by sync generate, batch submit, and dry-run.
+ */
+export function buildItemLlmRequest(
+  item: Pick<ItemRow, 'item_key' | 'input_data'>,
+  template: TemplateRow,
+): LlmRequest {
+  const notes = constraintNotes(template.output_schema, template.guards);
+  const withNotes = template.user_template.includes('{constraint_notes}')
+    ? template.user_template.replace('{constraint_notes}', notes)
+    : `${template.user_template}\n\n${notes}`;
+  const userPrompt = fillTemplate(withNotes, item.input_data);
+
+  let system = template.system_prompt;
+  const fewShots = (template.few_shots ?? []).filter(
+    (shot) => !(shot && typeof shot === 'object' && (shot as { item_key?: string }).item_key === item.item_key),
+  );
+  if (fewShots.length > 0) {
+    system += '\n\nVÍ DỤ THAM KHẢO (giọng văn & cấu trúc — KHÔNG chép lại nội dung, dữ kiện thuộc về tổ hợp khác):\n' +
+      fewShots.map((s, i) => `--- Ví dụ ${i + 1} ---\n${JSON.stringify((s as { output?: unknown }).output ?? s)}`).join('\n');
+  }
+
+  return {
+    model: template.model,
+    system,
+    userPrompt,
+    toolSchema: stripForStrict(template.output_schema) as Record<string, unknown>,
+    temperature: template.temperature,
+    maxTokens: template.max_tokens,
+  };
+}
+
+/**
+ * Persist gates, status, and token usage after an LLM result (sync or batch).
+ */
+export async function finalizeItemFromLlm(
+  deps: Pick<GenerateDeps, 'saveResult' | 'addJobUsage' | 'getJobReviewPct'>,
+  item: ItemRow,
+  template: TemplateRow,
+  llmResult: LlmResult,
+  opts: {
+    mode?: 'generate' | 'regenerate';
+    usageChannel: 'batch' | 'sync';
+  },
+): Promise<{ status: string; gates: GateResult[] }> {
+  await deps.addJobUsage(item.job_id, llmResult.tokensIn, llmResult.tokensOut, opts.usageChannel);
+
+  const output = coerceToSchema(llmResult.output, template.output_schema) as Record<string, unknown>;
+  const gates = assembleItemGates(output, template, item.input_data);
+
+  const reviewPct = await deps.getJobReviewPct(item.job_id);
+  const anyFail = hasFailingGate(gates);
+  const anyFlag = gates.some((g) => g.severity === 'flag' && !g.passed);
+  const sampled = reviewSampleHit(item.item_key, reviewPct);
+  const status = anyFail ? 'failed_validation' : anyFlag || sampled ? 'flagged' : 'generated';
+
+  const tokensIn = (item.tokens_in ?? 0) + llmResult.tokensIn;
+  const tokensOut = (item.tokens_out ?? 0) + llmResult.tokensOut;
+
+  await deps.saveResult(item, {
+    output,
+    status,
+    validation: { gates, review_sampled: sampled },
+    regen_count: opts.mode === 'regenerate' ? item.regen_count + 1 : item.regen_count,
+    tokens_in: tokensIn,
+    tokens_out: tokensOut,
+    usage_channel: opts.usageChannel,
+  });
+
+  return { status, gates };
 }
 
 /**
@@ -431,57 +506,11 @@ export async function generateItem(deps: GenerateDeps, req: GenerateRequest): Pr
     return { ok: false, error: `template ${item.template_key} v${item.template_version} not found` };
   }
 
-  // Build the prompt. constraint_notes is substituted first, then ONE fill
-  // pass resolves every {token} — including tokens inside the notes.
-  const notes = constraintNotes(template.output_schema, template.guards);
-  const withNotes = template.user_template.includes('{constraint_notes}')
-    ? template.user_template.replace('{constraint_notes}', notes)
-    : `${template.user_template}\n\n${notes}`;
-  const userPrompt = fillTemplate(withNotes, item.input_data);
-
-  let system = template.system_prompt;
-  const fewShots = (template.few_shots ?? []).filter(
-    // Never few-shot the combo being generated (WP6 distillation rule).
-    (shot) => !(shot && typeof shot === 'object' && (shot as { item_key?: string }).item_key === item.item_key),
-  );
-  if (fewShots.length > 0) {
-    system += '\n\nVÍ DỤ THAM KHẢO (giọng văn & cấu trúc — KHÔNG chép lại nội dung, dữ kiện thuộc về tổ hợp khác):\n' +
-      fewShots.map((s, i) => `--- Ví dụ ${i + 1} ---\n${JSON.stringify((s as { output?: unknown }).output ?? s)}`).join('\n');
-  }
-
-  const llmResult = await deps.llm({
-    model: template.model,
-    system,
-    userPrompt,
-    toolSchema: stripForStrict(template.output_schema) as Record<string, unknown>,
-    temperature: template.temperature,
-    maxTokens: template.max_tokens,
-  });
-  await deps.addJobUsage(item.job_id, llmResult.tokensIn, llmResult.tokensOut);
-
-  const output = coerceToSchema(llmResult.output, template.output_schema) as Record<string, unknown>;
-
-  // Gates: schema (mirrors strict mode), generic per-item gates over resolved
-  // guards, faq_shape. Batch gates run later in prose-admin.
-  const gates = assembleItemGates(output, template, item.input_data);
-
-  const reviewPct = await deps.getJobReviewPct(item.job_id);
-  const anyFail = hasFailingGate(gates);
-  const anyFlag = gates.some((g) => g.severity === 'flag' && !g.passed);
-  const sampled = reviewSampleHit(item.item_key, reviewPct);
-  const status = anyFail ? 'failed_validation' : anyFlag || sampled ? 'flagged' : 'generated';
-
-  // Accumulate tokens across regens so Actual Cost reflects total spend.
-  const tokensIn = (item.tokens_in ?? 0) + llmResult.tokensIn;
-  const tokensOut = (item.tokens_out ?? 0) + llmResult.tokensOut;
-
-  await deps.saveResult(item, {
-    output,
-    status,
-    validation: { gates, review_sampled: sampled },
-    regen_count: req.mode === 'regenerate' ? item.regen_count + 1 : item.regen_count,
-    tokens_in: tokensIn,
-    tokens_out: tokensOut,
+  const llmReq = buildItemLlmRequest(item, template);
+  const llmResult = await deps.llm(llmReq);
+  const { status, gates } = await finalizeItemFromLlm(deps, item, template, llmResult, {
+    mode: req.mode,
+    usageChannel: 'sync',
   });
 
   return { ok: true, status, cached: false, item_key: item.item_key, gates };
@@ -504,30 +533,13 @@ export async function dryRunTemplate(
 }> {
   const template = req.template;
   const itemKey = req.item_key ?? 'dry-run';
-  const notes = constraintNotes(template.output_schema, template.guards);
-  const withNotes = template.user_template.includes('{constraint_notes}')
-    ? template.user_template.replace('{constraint_notes}', notes)
-    : `${template.user_template}\n\n${notes}`;
-  const userPrompt = fillTemplate(withNotes, req.input_data);
-
-  let system = template.system_prompt;
-  const fewShots = (template.few_shots ?? []).filter(
-    (shot) => !(shot && typeof shot === 'object' && (shot as { item_key?: string }).item_key === itemKey),
-  );
-  if (fewShots.length > 0) {
-    system += '\n\nVÍ DỤ THAM KHẢO (giọng văn & cấu trúc — KHÔNG chép lại nội dung, dữ kiện thuộc về tổ hợp khác):\n' +
-      fewShots.map((s, i) => `--- Ví dụ ${i + 1} ---\n${JSON.stringify((s as { output?: unknown }).output ?? s)}`).join('\n');
-  }
 
   try {
-    const llmResult = await deps.llm({
-      model: template.model,
-      system,
-      userPrompt,
-      toolSchema: stripForStrict(template.output_schema) as Record<string, unknown>,
-      temperature: template.temperature,
-      maxTokens: template.max_tokens,
-    });
+    const llmReq = buildItemLlmRequest(
+      { item_key: itemKey, input_data: req.input_data },
+      template,
+    );
+    const llmResult = await deps.llm(llmReq);
     const output = coerceToSchema(llmResult.output, template.output_schema) as Record<string, unknown>;
     const gates = assembleItemGates(output, template, req.input_data);
     return {
@@ -540,4 +552,225 @@ export async function dryRunTemplate(
   } catch (err) {
     return { ok: false, error: String(err instanceof Error ? err.message : err) };
   }
+}
+
+// ── Anthropic Message Batches ────────────────────────────────────────────────
+
+export interface JobBatchRow {
+  id: string;
+  mode: string;
+  anthropic_batch_id: string | null;
+  batch_status: string | null;
+}
+
+export interface BatchDeps extends GenerateDeps {
+  getJob(jobId: string): Promise<JobBatchRow | null>;
+  listPendingItems(jobId: string): Promise<ItemRow[]>;
+  countPending(jobId: string): Promise<number>;
+  updateJobBatch(jobId: string, patch: {
+    anthropic_batch_id?: string | null;
+    batch_status?: string | null;
+    status?: string;
+    run_channel?: string;
+  }): Promise<void>;
+  /** Leave item pending but record why a batch custom failed. */
+  noteBatchFailure(item: ItemRow, error: string): Promise<void>;
+}
+
+export interface AnthropicBatchApi {
+  create(requests: Array<{ custom_id: string; params: Record<string, unknown> }>): Promise<{ id: string }>;
+  retrieve(batchId: string): Promise<{
+    processing_status: string;
+    request_counts?: {
+      processing?: number;
+      succeeded?: number;
+      errored?: number;
+      canceled?: number;
+      expired?: number;
+    };
+  }>;
+  results(batchId: string): AsyncIterable<{
+    custom_id: string;
+    result: {
+      type: string;
+      message?: {
+        content: Array<{ type: string; name?: string; input?: unknown }>;
+        usage: { input_tokens: number; output_tokens: number };
+      };
+      error?: { message?: string };
+    };
+  }>;
+}
+
+/** Parse a succeeded batch result into LlmResult (emit_content tool input + tokens). */
+export function llmResultFromBatchMessage(message: {
+  content: Array<{ type: string; name?: string; input?: unknown }>;
+  usage: { input_tokens: number; output_tokens: number };
+}): LlmResult | null {
+  const toolUse = message.content.find(
+    (b) => b.type === 'tool_use' && b.name === 'emit_content',
+  );
+  if (!toolUse?.input) return null;
+  return {
+    output: toolUse.input,
+    tokensIn: message.usage.input_tokens,
+    tokensOut: message.usage.output_tokens,
+  };
+}
+
+export async function submitBatchJob(
+  deps: BatchDeps,
+  batchApi: AnthropicBatchApi,
+  toMessageParams: (req: LlmRequest) => Record<string, unknown>,
+  jobId: string,
+): Promise<{
+  ok: boolean;
+  batch_id?: string;
+  request_count?: number;
+  remaining?: number;
+  batch_status?: string;
+  error?: string;
+}> {
+  const job = await deps.getJob(jobId);
+  if (!job) return { ok: false, error: `job ${jobId} not found` };
+  if (job.anthropic_batch_id) {
+    return { ok: false, error: 'batch already submitted — use collect_batch' };
+  }
+
+  const pending = await deps.listPendingItems(jobId);
+  if (pending.length === 0) {
+    const remaining = await deps.countPending(jobId);
+    return { ok: true, request_count: 0, remaining };
+  }
+
+  const templateCache = new Map<string, TemplateRow | null>();
+  const requests: Array<{ custom_id: string; params: Record<string, unknown> }> = [];
+
+  for (const item of pending) {
+    const tplKey = `${item.site_id}:${item.template_key}:${item.template_version}`;
+    let template = templateCache.get(tplKey);
+    if (template === undefined) {
+      template = await deps.getTemplate(item.site_id, item.template_key, item.template_version);
+      templateCache.set(tplKey, template);
+    }
+    if (!template) continue;
+
+    const expectedHash = await dataHash(item.input_data);
+    if (expectedHash !== item.data_hash) continue;
+
+    const llmReq = buildItemLlmRequest(item, template);
+    requests.push({ custom_id: item.id, params: toMessageParams(llmReq) });
+  }
+
+  if (requests.length === 0) {
+    const remaining = await deps.countPending(jobId);
+    return { ok: true, request_count: 0, remaining };
+  }
+
+  const batch = await batchApi.create(requests);
+  await deps.updateJobBatch(jobId, {
+    anthropic_batch_id: batch.id,
+    batch_status: 'in_progress',
+    status: 'running',
+    run_channel: 'batch',
+  });
+
+  const remaining = await deps.countPending(jobId);
+  return {
+    ok: true,
+    batch_id: batch.id,
+    request_count: requests.length,
+    remaining,
+    batch_status: 'in_progress',
+  };
+}
+
+export async function collectBatchJob(
+  deps: BatchDeps,
+  batchApi: AnthropicBatchApi,
+  jobId: string,
+): Promise<{
+  ok: boolean;
+  batch_status?: string;
+  request_counts?: AnthropicBatchApi['retrieve'] extends (...args: never) => Promise<infer R> ? R extends { request_counts?: infer C } ? C : never : never;
+  processed?: number;
+  remaining?: number;
+  failures?: number;
+  error?: string;
+}> {
+  const job = await deps.getJob(jobId);
+  if (!job) return { ok: false, error: `job ${jobId} not found` };
+  if (!job.anthropic_batch_id) return { ok: false, error: 'no anthropic_batch_id on job' };
+
+  const batch = await batchApi.retrieve(job.anthropic_batch_id);
+  await deps.updateJobBatch(jobId, { batch_status: batch.processing_status });
+
+  if (batch.processing_status !== 'ended') {
+    const remaining = await deps.countPending(jobId);
+    return {
+      ok: true,
+      batch_status: batch.processing_status,
+      request_counts: batch.request_counts,
+      remaining,
+      processed: 0,
+      failures: 0,
+    };
+  }
+
+  const templateCache = new Map<string, TemplateRow | null>();
+  let processed = 0;
+  let failures = 0;
+  const mode = job.mode === 'regenerate' ? 'regenerate' as const : 'generate' as const;
+
+  for await (const row of batchApi.results(job.anthropic_batch_id)) {
+    const item = await deps.getItem(row.custom_id);
+    if (!item || item.status !== 'pending') continue;
+
+    if (row.result.type === 'succeeded' && row.result.message) {
+      const llmResult = llmResultFromBatchMessage(row.result.message);
+      if (!llmResult) {
+        failures++;
+        await deps.noteBatchFailure(item, 'succeeded result missing emit_content tool_use');
+        continue;
+      }
+      const tplKey = `${item.site_id}:${item.template_key}:${item.template_version}`;
+      let template = templateCache.get(tplKey);
+      if (template === undefined) {
+        template = await deps.getTemplate(item.site_id, item.template_key, item.template_version);
+        templateCache.set(tplKey, template);
+      }
+      if (!template) {
+        failures++;
+        await deps.noteBatchFailure(item, `template ${item.template_key} v${item.template_version} not found`);
+        continue;
+      }
+      await finalizeItemFromLlm(deps, item, template, llmResult, { mode, usageChannel: 'batch' });
+      processed++;
+    } else {
+      failures++;
+      const detail = row.result.type === 'errored'
+        ? (row.result.error?.message ?? 'errored')
+        : row.result.type === 'expired'
+        ? 'expired'
+        : row.result.type === 'canceled'
+        ? 'canceled'
+        : `batch result type=${row.result.type}`;
+      await deps.noteBatchFailure(item, detail);
+    }
+  }
+
+  await deps.updateJobBatch(jobId, {
+    anthropic_batch_id: null,
+    batch_status: 'ended',
+  });
+
+  const remaining = await deps.countPending(jobId);
+  return {
+    ok: true,
+    batch_status: 'ended',
+    request_counts: batch.request_counts,
+    processed,
+    remaining,
+    failures,
+  };
 }

@@ -6,11 +6,14 @@
 import { assert, assertEquals, assertMatch, assertThrows } from './_assert.ts';
 import {
   buildComboInput,
+  buildItemLlmRequest,
   coerceToSchema,
   constraintNotes,
   fillTemplate,
+  finalizeItemFromLlm,
   gateFaqShape,
   generateItem,
+  llmResultFromBatchMessage,
   resolveGuards,
   reviewSampleHit,
   stripForStrict,
@@ -194,7 +197,7 @@ async function makeFakeWorld(llmOutput?: unknown) {
       Object.assign(item, patch);
       return Promise.resolve();
     },
-    addJobUsage: (_job, tin, tout) => {
+    addJobUsage: (_job, tin, tout, _channel?) => {
       calls.usage.push([tin, tout]);
       return Promise.resolve();
     },
@@ -295,4 +298,36 @@ Deno.test('generateItem: prompt contains resolved constraint notes, no leftover 
   assertMatch(prompt, /RÀNG BUỘC/);
   assertMatch(prompt, /metaDescription: phải chứa 7 và 3/);
   assert(!prompt.includes('{'), 'no unresolved placeholders');
+});
+
+Deno.test('buildItemLlmRequest: returns model, system, userPrompt, toolSchema', async () => {
+  const { template } = await makeFakeWorld();
+  const inputData = buildComboInput('so-chu-dao-7-su-menh-3') as unknown as Record<string, unknown>;
+  const req = buildItemLlmRequest({ item_key: 'so-chu-dao-7-su-menh-3', input_data: inputData }, template);
+  assertEquals(req.model, template.model);
+  assert(req.system.length > 0);
+  assertMatch(req.userPrompt, /RÀNG BUỘC/);
+  assertEquals(typeof req.toolSchema, 'object');
+  assertEquals(req.maxTokens, template.max_tokens);
+});
+
+Deno.test('llmResultFromBatchMessage: parses emit_content tool_use + usage', () => {
+  const out = validItem();
+  const llm = llmResultFromBatchMessage({
+    content: [{ type: 'tool_use', name: 'emit_content', input: out }],
+    usage: { input_tokens: 100, output_tokens: 200 },
+  });
+  assert(llm);
+  assertEquals(llm!.tokensIn, 100);
+  assertEquals(llm!.tokensOut, 200);
+  assertEquals((llm!.output as { tagline: string }).tagline, out.tagline);
+});
+
+Deno.test('finalizeItemFromLlm: batch channel sets usage_channel on save', async () => {
+  const { deps, item, template } = await makeFakeWorld();
+  await finalizeItemFromLlm(deps, item, template, { output: validItem(), tokensIn: 50, tokensOut: 30 }, {
+    usageChannel: 'batch',
+  });
+  assertEquals(item.status, 'generated');
+  assertEquals((item as ItemRow & { usage_channel?: string }).usage_channel, 'batch');
 });

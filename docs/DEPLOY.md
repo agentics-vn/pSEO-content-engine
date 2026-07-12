@@ -178,7 +178,10 @@ Log in with the admin user from step 3, then walk the loop:
 1. **Templates** (`#/templates`) — list versions, edit prompts, dry-run test panel (`POST /templates/test`).
 2. **Create job** (`#/jobs`) on `combo-so-chu-dao-su-menh` (combo grid, master = exclude,
    review_sample_pct = 100 for the golden set).
-3. **Run job** — it invokes `prose-generate` per item until none are pending.
+3. **Run job** — default path submits an **Anthropic Message Batch** (~50% token
+   cost), then collects results on subsequent Run clicks (Admin polls every ~20s
+   while `batch_status` is `in_progress`). Escape hatch: `POST /jobs/:id/run`
+   with `{ "channel": "sync" }` for the old per-item loop (debugging).
 4. **Review** (`#/jobs/:id/review`) — dual pane, edit JSON, regen (cap 3), approve/reject+note.
 5. **Publish** (`#/publish`) — bulk publish approved items.
 6. Confirm it's served:
@@ -201,11 +204,21 @@ A published item comes back as JSON. That round trip — generate → gate → r
 | POST | `/templates/test` | Dry-run via `prose-generate` (`dry_run: true`) |
 | GET | `/jobs`, `/jobs/:id` | Job list + single job |
 | POST | `/jobs` | Create (`items`, `item_keys`, or `enumerate: combo-grid`) |
-| POST | `/jobs/:id/run` | Drain pending items |
+| POST | `/jobs/:id/run` | Submit batch (first call) or collect results; optional `{ channel: "sync" }` |
 | GET | `/items` | `?status=&job_id=&template=&limit=` |
 | POST | `/items/:id/{approve,reject,edit,publish,regen}` | Regen capped at 3 |
 
-`prose-generate` also accepts `{ dry_run, template, input_data }` (service-role only).
+`prose-generate` also accepts `{ dry_run, template, input_data }` (service-role only),
+and batch actions `{ action: "submit_batch" | "collect_batch", job_id }`.
+
+### Migration `0009_channel_tokens`
+
+```sh
+supabase db query --linked < supabase/migrations/0009_channel_tokens.sql
+```
+
+Splits job token totals into `tokens_*_batch` / `tokens_*_sync` so Actual Cost
+can price mixed regen (sync) + batch spend correctly on job lists.
 
 ---
 

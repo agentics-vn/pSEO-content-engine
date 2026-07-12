@@ -115,6 +115,7 @@ export interface AdminItemRow {
   regen_count?: number;
   tokens_in?: number;
   tokens_out?: number;
+  usage_channel?: string | null;
 }
 
 export interface AdminDeps {
@@ -159,7 +160,13 @@ export interface AdminDeps {
   ): Promise<{ reset: string[]; published: string[] }>;
 
   getJob(siteId: string, jobId: string): Promise<
-    | { id: string; site_id: string; template_id: string; status: string; mode: string; review_sample_pct: number; item_count?: number; tokens_in?: number; tokens_out?: number; created_at?: string; finished_at?: string | null }
+    | {
+      id: string; site_id: string; template_id: string; status: string; mode: string;
+      review_sample_pct: number; item_count?: number; tokens_in?: number; tokens_out?: number;
+      tokens_in_batch?: number; tokens_out_batch?: number; tokens_in_sync?: number; tokens_out_sync?: number;
+      created_at?: string; finished_at?: string | null;
+      anthropic_batch_id?: string | null; batch_status?: string | null; run_channel?: string;
+    }
     | null
   >;
   getTemplateById(templateId: string): Promise<{ key: string; version: number; guards: Record<string, unknown> } | null>;
@@ -168,6 +175,8 @@ export interface AdminDeps {
   getJobItemsWithOutput(jobId: string): Promise<AdminItemRow[]>;
   saveBatchResults(itemId: string, similarity: number | null, batchGates: GateResult[]): Promise<void>;
   markJobDone(jobId: string): Promise<void>;
+  /** Patch job columns (e.g. run_channel on sync escape hatch). */
+  updateJob(jobId: string, patch: Record<string, unknown>): Promise<void>;
 
   listItems(siteId: string, filter: { status?: string; job_id?: string; template_key?: string; limit: number }): Promise<AdminItemRow[]>;
   getItem(siteId: string, itemId: string): Promise<AdminItemRow | null>;
@@ -175,6 +184,15 @@ export interface AdminDeps {
 
   /** Invoke prose-generate for one item (service-role, internal). */
   generate(itemId: string, mode?: string): Promise<{ ok: boolean; status?: string; cached?: boolean; error?: string }>;
+
+  submitBatch(jobId: string): Promise<{
+    ok: boolean; batch_id?: string; request_count?: number; remaining?: number;
+    batch_status?: string; error?: string;
+  }>;
+  collectBatch(jobId: string): Promise<{
+    ok: boolean; batch_status?: string; request_counts?: Record<string, number>;
+    processed?: number; remaining?: number; failures?: number; error?: string;
+  }>;
 
   getWebhooks(siteId: string): Promise<Array<{ url: string }>>;
   fireWebhook(url: string, payload: unknown): Promise<void>;
@@ -186,6 +204,10 @@ export interface AdminDeps {
     published_total: number;
     tokens_in: number;
     tokens_out: number;
+    tokens_in_batch?: number;
+    tokens_out_batch?: number;
+    tokens_in_sync?: number;
+    tokens_out_sync?: number;
   }>;
 
   /** Performance loop reads. */
@@ -431,31 +453,100 @@ export function makeAdminHandler(deps: AdminDeps, opts: { runBudgetMs?: number }
         }, 201);
       }
 
-      // ── POST /jobs/{id}/run — loop prose-generate, then batch gates ──────
+      // ── POST /jobs/{id}/run — batch submit/collect (default) or sync loop ─
       const run = path.match(/^\/jobs\/([0-9a-f-]+)\/run$/);
       if (req.method === 'POST' && run) {
         const job = await deps.getJob(site.site_id, run[1]);
         if (!job) return reply({ error: 'job not found' }, 404);
 
-        const started = deps.now();
+        const runBody = await req.json().catch(() => ({})) as { channel?: 'sync' | 'batch' };
+        const useSync = runBody.channel === 'sync';
+
+        if (useSync) {
+          await deps.updateJob(job.id, { run_channel: 'sync', status: 'running' });
+          const started = deps.now();
+          let processed = 0;
+          const failures: string[] = [];
+          const attempted = new Set<string>();
+          while (deps.now() - started < runBudgetMs) {
+            const ids = (await deps.getPendingItemIds(job.id, 500)).filter((id) => !attempted.has(id)).slice(0, 5);
+            if (ids.length === 0) break;
+            for (const id of ids) {
+              if (deps.now() - started >= runBudgetMs) break;
+              attempted.add(id);
+              const res = await deps.generate(id, job.mode);
+              processed++;
+              if (!res.ok) failures.push(`${id}: ${res.error}`);
+            }
+          }
+          const remaining = await deps.countPending(job.id);
+          let batchGatesRan = false;
+          if (remaining === 0) {
+            const template = await deps.getTemplateById(job.template_id);
+            const items = await deps.getJobItemsWithOutput(job.id);
+            const results = runBatchGates(
+              items.map((it) => ({ id: it.id, output: (it.edited_output ?? it.output)! })),
+              template?.guards ?? {},
+            );
+            for (const it of items) {
+              const r = results.get(it.id);
+              if (!r) continue;
+              await deps.saveBatchResults(it.id, r.similarity, r.gates);
+              if (it.status === 'generated' && r.gates.some((g) => !g.passed)) {
+                await deps.updateItem(it.id, { status: 'flagged' });
+              }
+            }
+            await deps.markJobDone(job.id);
+            batchGatesRan = true;
+          }
+          return reply({
+            ok: true, processed, remaining, batch_gates_ran: batchGatesRan, failures, channel: 'sync',
+          });
+        }
+
+        // Default: Anthropic Message Batch submit-or-collect.
         let processed = 0;
         const failures: string[] = [];
-        // One item per generate invocation; loop until drained or out of
-        // budget. An item that errors stays pending in the DB — track it so
-        // THIS invocation never re-attempts it and spins its budget away.
-        const attempted = new Set<string>();
-        while (deps.now() - started < runBudgetMs) {
-          // Fetch a wide window so that already-attempted (failed-but-still-
-          // pending) items don't crowd out unattempted ones within an
-          // invocation. attempted resets next invocation regardless.
-          const ids = (await deps.getPendingItemIds(job.id, 500)).filter((id) => !attempted.has(id)).slice(0, 5);
-          if (ids.length === 0) break;
-          for (const id of ids) {
-            if (deps.now() - started >= runBudgetMs) break;
-            attempted.add(id);
-            const res = await deps.generate(id, job.mode);
-            processed++;
-            if (!res.ok) failures.push(`${id}: ${res.error}`);
+        let batchStatus = job.batch_status ?? undefined;
+        let requestCounts: Record<string, number> | undefined;
+
+        if (job.anthropic_batch_id) {
+          const collected = await deps.collectBatch(job.id);
+          if (!collected.ok) return reply({ error: collected.error ?? 'collect failed' }, 422);
+          processed = collected.processed ?? 0;
+          batchStatus = collected.batch_status;
+          requestCounts = collected.request_counts;
+          if ((collected.failures ?? 0) > 0) {
+            failures.push(`${collected.failures} batch request(s) failed or expired`);
+          }
+        } else {
+          const pending = await deps.countPending(job.id);
+          if (pending > 0) {
+            const submitted = await deps.submitBatch(job.id);
+            if (!submitted.ok) return reply({ error: submitted.error ?? 'submit failed' }, 422);
+            // Zero requests (e.g. all hash-drift skips) — do not pretend a batch is in flight.
+            if ((submitted.request_count ?? 0) === 0 || !submitted.batch_id) {
+              return reply({
+                ok: true,
+                processed: 0,
+                remaining: submitted.remaining ?? pending,
+                batch_gates_ran: false,
+                failures: ['submit produced zero batch requests'],
+                channel: 'batch',
+              });
+            }
+            batchStatus = submitted.batch_status ?? 'in_progress';
+            return reply({
+              ok: true,
+              processed: 0,
+              remaining: submitted.remaining ?? pending,
+              batch_id: submitted.batch_id,
+              batch_status: batchStatus,
+              request_count: submitted.request_count,
+              batch_gates_ran: false,
+              failures: [],
+              channel: 'batch',
+            });
           }
         }
 
@@ -472,7 +563,6 @@ export function makeAdminHandler(deps: AdminDeps, opts: { runBudgetMs?: number }
             const r = results.get(it.id);
             if (!r) continue;
             await deps.saveBatchResults(it.id, r.similarity, r.gates);
-            // A red batch flag on a clean item pulls it into the review queue.
             if (it.status === 'generated' && r.gates.some((g) => !g.passed)) {
               await deps.updateItem(it.id, { status: 'flagged' });
             }
@@ -480,7 +570,17 @@ export function makeAdminHandler(deps: AdminDeps, opts: { runBudgetMs?: number }
           await deps.markJobDone(job.id);
           batchGatesRan = true;
         }
-        return reply({ ok: true, processed, remaining, batch_gates_ran: batchGatesRan, failures });
+
+        return reply({
+          ok: true,
+          processed,
+          remaining,
+          batch_gates_ran: batchGatesRan,
+          failures,
+          batch_status: batchStatus,
+          request_counts: requestCounts,
+          channel: 'batch',
+        });
       }
 
       // ── GET /jobs/{id}, GET /jobs — dashboard reads ──────────────────────

@@ -70,11 +70,18 @@ function mapJob(j: Record<string, unknown>): JobRow {
     item_count: Number(j.item_count ?? 0),
     tokens_in: Number(j.tokens_in ?? 0),
     tokens_out: Number(j.tokens_out ?? 0),
+    tokens_in_batch: Number(j.tokens_in_batch ?? 0),
+    tokens_out_batch: Number(j.tokens_out_batch ?? 0),
+    tokens_in_sync: Number(j.tokens_in_sync ?? 0),
+    tokens_out_sync: Number(j.tokens_out_sync ?? 0),
     created_at: j.created_at as string,
     finished_at: (j.finished_at as string | null) ?? null,
     template: tpl?.key,
     model: tpl?.model,
     review_sample_pct: j.review_sample_pct as number | undefined,
+    anthropic_batch_id: (j.anthropic_batch_id as string | null) ?? null,
+    batch_status: (j.batch_status as string | null) ?? null,
+    run_channel: (j.run_channel as string) ?? 'batch',
   };
 }
 
@@ -181,8 +188,14 @@ export class RemoteSource implements DataSource {
   createJob = (input: CreateJobInput) =>
     this.call<ApiResult & { job_id?: string; item_count?: number }>('POST', '/jobs', input);
 
-  runJob = (id: string) =>
-    this.call<ApiResult & { remaining?: number; processed?: number }>('POST', `/jobs/${id}/run`);
+  runJob = (id: string, opts?: { channel?: 'sync' | 'batch' }) =>
+    this.call<ApiResult & {
+      remaining?: number;
+      processed?: number;
+      batch_status?: string;
+      request_counts?: Record<string, number>;
+      channel?: string;
+    }>('POST', `/jobs/${id}/run`, opts);
 
   listItems = async (filter: { status?: string; job_id?: string; template?: string; limit?: number }) => {
     const params = new URLSearchParams();

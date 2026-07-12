@@ -10,7 +10,7 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
-const ITEM_COLS = 'id, site_id, job_id, template_key, template_version, item_key, status, input_data, output, edited_output, validation, similarity, regen_count, tokens_in, tokens_out';
+const ITEM_COLS = 'id, site_id, job_id, template_key, template_version, item_key, status, input_data, output, edited_output, validation, similarity, regen_count, tokens_in, tokens_out, usage_channel';
 
 const deps: AdminDeps = {
   async getUserId(jwt) {
@@ -133,7 +133,7 @@ const deps: AdminDeps = {
 
   async getJob(siteId, jobId) {
     const { data, error } = await supabase.from('prose_jobs')
-      .select('id, site_id, template_id, status, mode, review_sample_pct, item_count, tokens_in, tokens_out, created_at, finished_at, prose_templates ( key, version, model )')
+      .select('id, site_id, template_id, status, mode, review_sample_pct, item_count, tokens_in, tokens_out, tokens_in_batch, tokens_out_batch, tokens_in_sync, tokens_out_sync, created_at, finished_at, anthropic_batch_id, batch_status, run_channel, prose_templates ( key, version, model )')
       .eq('site_id', siteId).eq('id', jobId).maybeSingle();
     if (error) throw error;
     return data;
@@ -177,6 +177,11 @@ const deps: AdminDeps = {
       .update({ status: 'done', finished_at: new Date().toISOString() }).eq('id', jobId);
     if (error) throw error;
   },
+  async updateJob(jobId, patch) {
+    const { error } = await supabase.from('prose_jobs')
+      .update(patch).eq('id', jobId);
+    if (error) throw error;
+  },
 
   async listItems(siteId, filter) {
     let q = supabase.from('prose_items').select(ITEM_COLS).eq('site_id', siteId);
@@ -207,6 +212,30 @@ const deps: AdminDeps = {
         'content-type': 'application/json',
       },
       body: JSON.stringify({ item_id: itemId, mode }),
+    });
+    return await res.json();
+  },
+
+  async submitBatch(jobId) {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/prose-generate`, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ action: 'submit_batch', job_id: jobId }),
+    });
+    return await res.json();
+  },
+
+  async collectBatch(jobId) {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/prose-generate`, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ action: 'collect_batch', job_id: jobId }),
     });
     return await res.json();
   },
@@ -257,7 +286,7 @@ const deps: AdminDeps = {
 
   async listJobs(siteId, limit) {
     const { data, error } = await supabase.from('prose_jobs')
-      .select('id, status, mode, item_count, review_sample_pct, tokens_in, tokens_out, created_at, finished_at, prose_templates ( key, version, model )')
+      .select('id, status, mode, item_count, review_sample_pct, tokens_in, tokens_out, tokens_in_batch, tokens_out_batch, tokens_in_sync, tokens_out_sync, created_at, finished_at, anthropic_batch_id, batch_status, run_channel, prose_templates ( key, version, model )')
       .eq('site_id', siteId).order('created_at', { ascending: false }).limit(limit);
     if (error) throw error;
     return data ?? [];
@@ -272,11 +301,9 @@ const deps: AdminDeps = {
       byStatus[status] = count ?? 0;
     }
     const { data: tokens, error: tErr } = await supabase.from('prose_jobs')
-      .select('tokens_in, tokens_out').eq('site_id', siteId);
+      .select('tokens_in, tokens_out, tokens_in_batch, tokens_out_batch, tokens_in_sync, tokens_out_sync')
+      .eq('site_id', siteId);
     if (tErr) throw tErr;
-    // published_total = LIVE pages, from the dedup view — NOT the raw
-    // status='published' row count, which double-counts superseded versions
-    // (republishing v2 leaves v1's row at status='published' too).
     const { count: liveCount, error: pErr } = await supabase.from('prose_published')
       .select('item_key', { count: 'exact', head: true }).eq('site_id', siteId);
     if (pErr) throw pErr;
@@ -285,6 +312,10 @@ const deps: AdminDeps = {
       published_total: liveCount ?? 0,
       tokens_in: (tokens ?? []).reduce((s, j) => s + Number(j.tokens_in), 0),
       tokens_out: (tokens ?? []).reduce((s, j) => s + Number(j.tokens_out), 0),
+      tokens_in_batch: (tokens ?? []).reduce((s, j) => s + Number(j.tokens_in_batch ?? 0), 0),
+      tokens_out_batch: (tokens ?? []).reduce((s, j) => s + Number(j.tokens_out_batch ?? 0), 0),
+      tokens_in_sync: (tokens ?? []).reduce((s, j) => s + Number(j.tokens_in_sync ?? 0), 0),
+      tokens_out_sync: (tokens ?? []).reduce((s, j) => s + Number(j.tokens_out_sync ?? 0), 0),
     };
   },
 

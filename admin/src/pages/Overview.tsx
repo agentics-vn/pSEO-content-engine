@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { DashboardData, DataSource, JobRow, ReviewItem } from '../types';
-import { fmt, prettyKey, actualCostUsd, fmtUsd } from '../lib/format';
+import { fmt, prettyKey, jobActualCostUsd, fmtUsd, batchStatusLabel } from '../lib/format';
 import { drainJob } from '../lib/runJob';
 import { navigate } from '../router';
 import { ReviewListItem } from '../components/proseBits';
@@ -22,12 +22,20 @@ export function Overview({
 
   const s = data.stats.items_by_status;
   const needsReview = (s.generated ?? 0) + (s.flagged ?? 0) + (s.failed_validation ?? 0);
-  // Site-wide spend from /stats (all jobs), not just the recent jobs window.
-  // Model mix: price as Sonnet unless every recent job is Haiku.
+  // Site-wide spend from /stats — prefer channel splits when present.
   const homeModel = data.jobs.length > 0 && data.jobs.every((j) => /haiku/i.test(j.model ?? ''))
     ? 'claude-haiku'
     : 'claude-sonnet';
-  const totalCost = actualCostUsd(data.stats.tokens_in, data.stats.tokens_out, homeModel);
+  const totalCost = jobActualCostUsd({
+    tokens_in: data.stats.tokens_in,
+    tokens_out: data.stats.tokens_out,
+    tokens_in_batch: data.stats.tokens_in_batch,
+    tokens_out_batch: data.stats.tokens_out_batch,
+    tokens_in_sync: data.stats.tokens_in_sync,
+    tokens_out_sync: data.stats.tokens_out_sync,
+    run_channel: 'sync',
+    model: homeModel,
+  });
   const runnable = data.jobs.filter((j) => j.status !== 'done');
   const queue = data.review.filter((it) =>
     ['generated', 'flagged', 'failed_validation'].includes(it.status),
@@ -84,9 +92,11 @@ export function Overview({
                 <div className="ops-body">
                   <b>{j.template ?? j.id.slice(0, 8)}</b>
                   <span className="meta">
-                    {j.item_count} items · {j.status} · {j.id.slice(0, 8)}
+                    {j.item_count} items · {j.status}
+                    {batchStatusLabel(j) ? ` · ${batchStatusLabel(j)}` : ''}
+                    {' · '}{j.id.slice(0, 8)}
                     {' · '}
-                    <span className="cost">{fmtUsd(actualCostUsd(j.tokens_in, j.tokens_out, j.model))}</span>
+                    <span className="cost">{fmtUsd(jobActualCostUsd(j))}</span>
                   </span>
                 </div>
                 <div className="ops-actions">
@@ -105,7 +115,7 @@ export function Overview({
                   <span className="meta">
                     {j.item_count} items · done · {j.id.slice(0, 8)}
                     {' · '}
-                    <span className="cost">{fmtUsd(actualCostUsd(j.tokens_in, j.tokens_out, j.model))}</span>
+                    <span className="cost">{fmtUsd(jobActualCostUsd(j))}</span>
                   </span>
                 </div>
                 <div className="ops-actions">

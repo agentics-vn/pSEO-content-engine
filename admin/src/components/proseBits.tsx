@@ -1,5 +1,5 @@
 import type { GateResult } from '../types';
-import { gatesOf, prettyKey, shortStatus, actualCostUsd, fmtUsd } from '../lib/format';
+import { gatesOf, prettyKey, shortStatus, itemActualCostUsd, fmtUsd } from '../lib/format';
 import type { ReviewItem } from '../types';
 
 export function StatusPill({ status }: { status: string }) {
@@ -16,7 +16,7 @@ export function ReviewListItem({
   active: boolean;
   model?: string;
 }) {
-  const cost = actualCostUsd(item.tokens_in ?? 0, item.tokens_out ?? 0, model);
+  const cost = itemActualCostUsd(item, model);
   return (
     <span className={`review-list-item${active ? ' on' : ''}`}>
       <span

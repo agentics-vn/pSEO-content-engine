@@ -16,7 +16,8 @@ export interface ReviewItem {
   regen_count?: number;
   tokens_in?: number;
   tokens_out?: number;
-  validation: { gates?: GateResult[]; batch_gates?: GateResult[] };
+  usage_channel?: string | null;
+  validation: { gates?: GateResult[]; batch_gates?: GateResult[]; batch_error?: string; review_sampled?: boolean };
   output: Record<string, unknown> | null;
   edited_output: Record<string, unknown> | null;
   input_data?: Record<string, unknown>;
@@ -29,11 +30,18 @@ export interface JobRow {
   item_count: number;
   tokens_in: number;
   tokens_out: number;
+  tokens_in_batch?: number;
+  tokens_out_batch?: number;
+  tokens_in_sync?: number;
+  tokens_out_sync?: number;
   created_at: string;
   finished_at: string | null;
   template?: string;
   model?: string;
   review_sample_pct?: number;
+  anthropic_batch_id?: string | null;
+  batch_status?: string | null;
+  run_channel?: string;
 }
 
 export interface TemplateRow {
@@ -60,6 +68,10 @@ export interface Stats {
   published_total: number;
   tokens_in: number;
   tokens_out: number;
+  tokens_in_batch?: number;
+  tokens_out_batch?: number;
+  tokens_in_sync?: number;
+  tokens_out_sync?: number;
 }
 
 export interface DashboardData {
@@ -116,7 +128,13 @@ export interface DataSource {
   listJobs(limit?: number): Promise<JobRow[]>;
   getJob(id: string): Promise<JobRow | null>;
   createJob(input: CreateJobInput): Promise<ApiResult & { job_id?: string; item_count?: number }>;
-  runJob(id: string): Promise<ApiResult & { remaining?: number; processed?: number }>;
+  runJob(id: string, opts?: { channel?: 'sync' | 'batch' }): Promise<ApiResult & {
+    remaining?: number;
+    processed?: number;
+    batch_status?: string;
+    request_counts?: Record<string, number>;
+    channel?: string;
+  }>;
   listItems(filter: { status?: string; job_id?: string; template?: string; limit?: number }): Promise<ReviewItem[]>;
   approve(itemId: string): Promise<ApiResult>;
   reject(itemId: string, note?: string): Promise<ApiResult>;

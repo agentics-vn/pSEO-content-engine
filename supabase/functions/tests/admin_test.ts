@@ -14,7 +14,10 @@ interface World {
   deps: AdminDeps;
   metrics: Array<{ item_key: string; clicks: number; impressions: number; avg_position: number | null; conversions: number; revenue: number }>;
   items: Map<string, AdminItemRow & { data_hash: string }>;
-  jobs: Map<string, { id: string; site_id: string; template_id: string; status: string; mode: string; review_sample_pct: number }>;
+  jobs: Map<string, {
+    id: string; site_id: string; template_id: string; status: string; mode: string;
+    review_sample_pct: number; anthropic_batch_id?: string | null; batch_status?: string | null; run_channel?: string;
+  }>;
   templates: Map<string, {
     id: string; site_id: string; key: string; version: number; name: string; model: string;
     created_at: string; guards: Record<string, unknown>; output_schema: Record<string, unknown>;
@@ -89,7 +92,10 @@ function makeWorld(role: string = 'reviewer'): World {
         .map((i) => i.item_key))),
     insertJob: (row) => {
       const id = uid();
-      jobs.set(id, { id, site_id: row.site_id, template_id: row.template_id, status: 'pending', mode: row.mode, review_sample_pct: row.review_sample_pct });
+      jobs.set(id, {
+        id, site_id: row.site_id, template_id: row.template_id, status: 'pending', mode: row.mode,
+        review_sample_pct: row.review_sample_pct, run_channel: 'batch',
+      });
       return Promise.resolve({ id });
     },
     insertItems: (rows) => {
@@ -145,6 +151,10 @@ function makeWorld(role: string = 'reviewer'): World {
       jobs.get(jobId)!.status = 'done';
       return Promise.resolve();
     },
+    updateJob: (jobId, patch) => {
+      Object.assign(jobs.get(jobId)!, patch);
+      return Promise.resolve();
+    },
 
     listItems: (siteId, filter) =>
       Promise.resolve([...items.values()].filter((i) =>
@@ -160,7 +170,7 @@ function makeWorld(role: string = 'reviewer'): World {
       return Promise.resolve();
     },
 
-    // Fake prose-generate: writes a distinct clean output per item.
+    // Fake prose-generate sync: writes a distinct clean output per item.
     generate: (itemId, mode) => {
       generateCalls.push(itemId);
       const it = items.get(itemId)!;
@@ -174,7 +184,58 @@ function makeWorld(role: string = 'reviewer'): World {
       it.status = 'generated';
       if (mode === 'regenerate') it.regen_count = (it.regen_count ?? 0) + 1;
       it.validation = { gates: [{ gate: 'schema', severity: 'fail', passed: true }] };
+      it.usage_channel = 'sync';
       return Promise.resolve({ ok: true, status: 'generated' });
+    },
+
+    submitBatch: (jobId) => {
+      const j = jobs.get(jobId)!;
+      if (j.anthropic_batch_id) {
+        return Promise.resolve({ ok: false, error: 'batch already submitted — use collect_batch' });
+      }
+      const pending = [...items.values()].filter((i) => i.job_id === jobId && i.status === 'pending');
+      if (pending.length === 0) {
+        return Promise.resolve({ ok: true, request_count: 0, remaining: 0 });
+      }
+      j.anthropic_batch_id = `batch-${jobId}`;
+      j.batch_status = 'in_progress';
+      j.status = 'running';
+      j.run_channel = 'batch';
+      return Promise.resolve({
+        ok: true,
+        batch_id: j.anthropic_batch_id,
+        request_count: pending.length,
+        remaining: pending.length,
+        batch_status: 'in_progress',
+      });
+    },
+
+    collectBatch: (jobId) => {
+      const j = jobs.get(jobId)!;
+      if (!j.anthropic_batch_id) {
+        return Promise.resolve({ ok: false, error: 'no anthropic_batch_id on job' });
+      }
+      const pending = [...items.values()].filter((i) => i.job_id === jobId && i.status === 'pending');
+      for (const it of pending) {
+        it.output = {
+          intro: `Bài viết riêng cho ${it.item_key}: ${it.item_key.split('').reverse().join(' ')}`,
+          faqs: [{ q: 'q', a: 'a' }],
+        };
+        it.status = 'generated';
+        it.validation = { gates: [{ gate: 'schema', severity: 'fail', passed: true }] };
+        it.usage_channel = 'batch';
+      }
+      j.anthropic_batch_id = null;
+      j.batch_status = 'ended';
+      const remaining = [...items.values()].filter((i) => i.job_id === jobId && i.status === 'pending').length;
+      return Promise.resolve({
+        ok: true,
+        batch_status: 'ended',
+        processed: pending.length,
+        remaining,
+        failures: 0,
+        request_counts: { succeeded: pending.length, processing: 0 },
+      });
     },
 
     getMetricsSummary: () => Promise.resolve(metrics),
@@ -417,7 +478,7 @@ Deno.test('POST /jobs with life_paths filter narrows the row', async () => {
   assertEquals((await res.json()).item_count, 9);
 });
 
-Deno.test('run loop drains pending items, then runs batch gates and closes the job (WP4 acceptance)', async () => {
+Deno.test('run loop submits batch then collects, runs batch gates and closes the job (WP4 acceptance)', async () => {
   const w = makeWorld();
   const create = await call(w.deps, 'POST', '/jobs', {
     template_key: 'combo-so-chu-dao-su-menh',
@@ -426,8 +487,15 @@ Deno.test('run loop drains pending items, then runs batch gates and closes the j
   });
   const { job_id } = await create.json();
 
-  const run = await call(w.deps, 'POST', `/jobs/${job_id}/run`);
-  const body = await run.json();
+  const submit = await call(w.deps, 'POST', `/jobs/${job_id}/run`);
+  const submitBody = await submit.json();
+  assertEquals(submitBody.request_count, 5);
+  assertEquals(submitBody.remaining, 5);
+  assertEquals(submitBody.batch_status, 'in_progress');
+  assertEquals(submitBody.channel, 'batch');
+
+  const collect = await call(w.deps, 'POST', `/jobs/${job_id}/run`);
+  const body = await collect.json();
   assertEquals(body.processed, 5);
   assertEquals(body.remaining, 0);
   assertEquals(body.batch_gates_ran, true);
@@ -437,12 +505,13 @@ Deno.test('run loop drains pending items, then runs batch gates and closes the j
   assertEquals(jobItems.length, 5);
   for (const it of jobItems) {
     assert(it.status === 'generated' || it.status === 'flagged');
+    assertEquals(it.usage_channel, 'batch');
     assert(Array.isArray(it.validation.batch_gates), 'batch gates written back');
     assert(typeof it.similarity === 'number', 'similarity written back');
   }
 });
 
-Deno.test('re-running a drained job is idempotent: cached generates, no new pending', async () => {
+Deno.test('re-running a drained job is idempotent: no new batch submit, no sync generates', async () => {
   const w = makeWorld();
   const create = await call(w.deps, 'POST', '/jobs', {
     template_key: 'combo-so-chu-dao-su-menh',
@@ -450,11 +519,13 @@ Deno.test('re-running a drained job is idempotent: cached generates, no new pend
   });
   const { job_id } = await create.json();
   await call(w.deps, 'POST', `/jobs/${job_id}/run`);
+  await call(w.deps, 'POST', `/jobs/${job_id}/run`);
   const callsAfterFirst = w.generateCalls.length;
 
   const again = await call(w.deps, 'POST', `/jobs/${job_id}/run`);
   const body = await again.json();
-  assertEquals(body.processed, 0, 'no pending items → no generate calls');
+  assertEquals(body.processed, 0, 'no pending items → no collect processing');
+  assertEquals(body.remaining, 0);
   assertEquals(w.generateCalls.length, callsAfterFirst);
 
   // Recreating the same job dedupes on the cache key: zero rows inserted.
@@ -465,6 +536,23 @@ Deno.test('re-running a drained job is idempotent: cached generates, no new pend
   assertEquals((await recreate.json()).inserted, 0);
 });
 
+Deno.test('sync escape hatch still drains via per-item generate', async () => {
+  const w = makeWorld();
+  const create = await call(w.deps, 'POST', '/jobs', {
+    template_key: 'combo-so-chu-dao-su-menh',
+    item_keys: ['so-chu-dao-4-su-menh-4', 'so-chu-dao-5-su-menh-5'],
+  });
+  const { job_id } = await create.json();
+  const run = await call(w.deps, 'POST', `/jobs/${job_id}/run`, { channel: 'sync' });
+  const body = await run.json();
+  assertEquals(body.channel, 'sync');
+  assertEquals(body.processed, 2);
+  assertEquals(body.remaining, 0);
+  assertEquals(body.batch_gates_ran, true);
+  assertEquals(w.generateCalls.length, 2);
+  assertEquals(w.jobs.get(job_id)!.run_channel, 'sync');
+});
+
 Deno.test('regenerate resets in-review items to pending; published items need a version bump (audit fix)', async () => {
   const w = makeWorld();
   const create = await call(w.deps, 'POST', '/jobs', {
@@ -472,6 +560,7 @@ Deno.test('regenerate resets in-review items to pending; published items need a 
     item_keys: ['so-chu-dao-7-su-menh-1', 'so-chu-dao-7-su-menh-2'],
   });
   const { job_id } = await create.json();
+  await call(w.deps, 'POST', `/jobs/${job_id}/run`);
   await call(w.deps, 'POST', `/jobs/${job_id}/run`); // both → generated
   // Publish one; leave the other in review.
   const gen = [...w.items.values()].filter((i) => i.job_id === job_id);

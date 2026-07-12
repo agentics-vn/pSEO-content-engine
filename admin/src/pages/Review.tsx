@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { DataSource, JobRow, ReviewItem } from '../types';
-import { gatesOf, prettyKey, actualCostUsd, fmtUsd } from '../lib/format';
+import { gatesOf, prettyKey, jobActualCostUsd, itemActualCostUsd, fmtUsd } from '../lib/format';
 import { navigate } from '../router';
 import { GateList, OutputPreview, ReviewListItem, StatusPill } from '../components/proseBits';
 
@@ -48,8 +48,8 @@ export function ReviewPage({
   const current = filtered[Math.min(idx, Math.max(filtered.length - 1, 0))] ?? null;
   const displayOutput = current?.edited_output ?? current?.output ?? null;
   const model = job?.model ?? 'claude-sonnet';
-  const jobCost = job ? actualCostUsd(job.tokens_in, job.tokens_out, model) : 0;
-  const itemsCost = items.reduce((s, it) => s + actualCostUsd(it.tokens_in ?? 0, it.tokens_out ?? 0, model), 0);
+  const jobCost = job ? jobActualCostUsd(job, items) : 0;
+  const itemsCost = items.reduce((s, it) => s + itemActualCostUsd(it, model), 0);
 
   const reload = useCallback(async (anchorId?: string) => {
     const [jobRow, list] = await Promise.all([
@@ -215,7 +215,7 @@ export function ReviewPage({
                   {current.regen_count ? ` · regen ${current.regen_count}/3` : ''}
                   {' · '}
                   <span className="cost" title={`${current.tokens_in ?? 0} in / ${current.tokens_out ?? 0} out`}>
-                    {fmtUsd(actualCostUsd(current.tokens_in ?? 0, current.tokens_out ?? 0, model))}
+                    {fmtUsd(itemActualCostUsd(current, model))}
                   </span>
                 </span>
               </div>
@@ -267,6 +267,11 @@ export function ReviewPage({
               </div>
               <div>
                 <h3>Gates</h3>
+                {current.validation.batch_error && (
+                  <p className="hint" style={{ color: 'var(--bad, #a33)' }}>
+                    Batch error: {current.validation.batch_error}
+                  </p>
+                )}
                 <GateList gates={gatesOf(current)} />
               </div>
             </div>

@@ -1,4 +1,4 @@
-import type { GateResult, ReviewItem } from '../types';
+import type { GateResult, JobRow, ReviewItem } from '../types';
 
 export const fmt = (n: number) => n.toLocaleString('en-US');
 export const fmtK = (n: number) =>
@@ -47,11 +47,19 @@ export function modelRates(model: string): { inPerM: number; outPerM: number } {
   return { inPerM: 3, outPerM: 15 };
 }
 
-/** Actual USD from recorded token usage. */
-export function actualCostUsd(tokensIn: number, tokensOut: number, model = 'claude-sonnet'): number {
+export type UsageChannel = 'batch' | 'sync';
+
+/** Actual USD from recorded token usage. Batch channel uses half rates. */
+export function actualCostUsd(
+  tokensIn: number,
+  tokensOut: number,
+  model = 'claude-sonnet',
+  channel: UsageChannel = 'sync',
+): number {
   if (tokensIn <= 0 && tokensOut <= 0) return 0;
   const { inPerM, outPerM } = modelRates(model);
-  return (tokensIn * inPerM + tokensOut * outPerM) / 1_000_000;
+  const rateMul = channel === 'batch' ? 0.5 : 1;
+  return (tokensIn * inPerM + tokensOut * outPerM) * rateMul / 1_000_000;
 }
 
 export function fmtUsd(n: number): string {
@@ -60,13 +68,60 @@ export function fmtUsd(n: number): string {
   return `$${n.toFixed(2)}`;
 }
 
-/** Client-side cost estimate (no LLM call). */
-export function estimateJobCost(itemCount: number, maxTokens: number, model: string): {
-  items: number; estTokens: number; estUsd: number;
+/** Item-level actual cost using usage_channel when set. */
+export function itemActualCostUsd(
+  item: Pick<ReviewItem, 'tokens_in' | 'tokens_out' | 'usage_channel'>,
+  model?: string,
+): number {
+  return actualCostUsd(
+    item.tokens_in ?? 0,
+    item.tokens_out ?? 0,
+    model,
+    (item.usage_channel as UsageChannel | undefined) ?? 'sync',
+  );
+}
+
+/** Job actual cost: prefer channel token splits; else items; else run_channel × totals. */
+export function jobActualCostUsd(
+  job: Pick<JobRow, 'tokens_in' | 'tokens_out' | 'run_channel' | 'model'
+    | 'tokens_in_batch' | 'tokens_out_batch' | 'tokens_in_sync' | 'tokens_out_sync'>,
+  items?: Array<Pick<ReviewItem, 'tokens_in' | 'tokens_out' | 'usage_channel'>>,
+): number {
+  const bin = job.tokens_in_batch ?? 0;
+  const bout = job.tokens_out_batch ?? 0;
+  const sin = job.tokens_in_sync ?? 0;
+  const sout = job.tokens_out_sync ?? 0;
+  if (bin > 0 || bout > 0 || sin > 0 || sout > 0) {
+    return actualCostUsd(bin, bout, job.model, 'batch')
+      + actualCostUsd(sin, sout, job.model, 'sync');
+  }
+  if (items?.some((it) => (it.tokens_in ?? 0) > 0 || (it.tokens_out ?? 0) > 0)) {
+    return items.reduce((s, it) => s + itemActualCostUsd(it, job.model), 0);
+  }
+  const ch = (job.run_channel as UsageChannel | undefined) ?? 'batch';
+  return actualCostUsd(job.tokens_in, job.tokens_out, job.model, ch);
+}
+
+/** Client-side cost estimate (no LLM call). Batch uses half rates. */
+export function estimateJobCost(
+  itemCount: number,
+  maxTokens: number,
+  model: string,
+  channel: UsageChannel = 'batch',
+): {
+  items: number; estTokens: number; estUsd: number; channel: UsageChannel;
 } {
   const perItem = maxTokens * 1.4;
   const estTokens = Math.round(itemCount * perItem);
   const { inPerM, outPerM } = modelRates(model);
-  const estUsd = (estTokens * 0.6 * inPerM + estTokens * 0.4 * outPerM) / 1_000_000;
-  return { items: itemCount, estTokens, estUsd: Math.round(estUsd * 100) / 100 };
+  const rateMul = channel === 'batch' ? 0.5 : 1;
+  const estUsd = (estTokens * 0.6 * inPerM + estTokens * 0.4 * outPerM) * rateMul / 1_000_000;
+  return { items: itemCount, estTokens, estUsd: Math.round(estUsd * 100) / 100, channel };
+}
+
+export function batchStatusLabel(job: Pick<JobRow, 'batch_status' | 'anthropic_batch_id'>): string | null {
+  if (!job.anthropic_batch_id && !job.batch_status) return null;
+  if (job.batch_status === 'in_progress' || job.batch_status === 'canceling') return 'Batch…';
+  if (job.batch_status === 'ended') return 'Collected';
+  return job.batch_status ?? 'Batch';
 }

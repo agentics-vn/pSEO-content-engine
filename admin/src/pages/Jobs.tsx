@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { CreateJobInput, DataSource, JobRow, TemplateRow } from '../types';
 import { countComboGrid } from '../lib/comboGrid';
-import { estimateJobCost, actualCostUsd, fmtUsd } from '../lib/format';
+import { estimateJobCost, jobActualCostUsd, fmtUsd, batchStatusLabel } from '../lib/format';
 import { latestPerKey } from '../lib/templates';
 import { drainJob } from '../lib/runJob';
 import { navigate } from '../router';
@@ -144,7 +144,10 @@ export function JobsPage({
                     </button>
                   ))}
                 </div>
-                <p className="hint">{comboCount} combos{estimate ? ` · ~$${estimate.estUsd}` : ''}</p>
+                <p className="hint">
+                  {comboCount} combos
+                  {estimate ? ` · Batch estimate ~$${estimate.estUsd} (50% of sync)` : ''}
+                </p>
               </div>
             ) : (
               <div className="full">
@@ -176,10 +179,15 @@ export function JobsPage({
               <tr key={j.id}>
                 <td><code>{j.id.slice(0, 8)}</code></td>
                 <td>{j.template ?? '—'}</td>
-                <td><span className={`st st-${j.status}`}>{j.status}</span></td>
+                <td>
+                  <span className={`st st-${j.status}`}>{j.status}</span>
+                  {batchStatusLabel(j) && (
+                    <span className="st st-flagged" style={{ marginLeft: 6 }}>{batchStatusLabel(j)}</span>
+                  )}
+                </td>
                 <td>{j.item_count}</td>
                 <td className="cost" title={`${j.tokens_in} in / ${j.tokens_out} out`}>
-                  {fmtUsd(actualCostUsd(j.tokens_in, j.tokens_out, j.model))}
+                  {fmtUsd(jobActualCostUsd(j))}
                 </td>
                 <td className="row-actions">
                   <button type="button" className="btn-ghost sm" onClick={() => navigate({ page: 'review', jobId: j.id })}>Review</button>
