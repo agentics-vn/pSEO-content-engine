@@ -73,15 +73,19 @@ validator passes and generation runs without surprises.
 
 ```
 seeds/<client>/
+  # engine INGESTS these:
   site.json              # {slug, name, domain}
   template.<key>.json    # output_schema + guards + prompts + model  (the core)
   worklist.golden.json   # the golden-set job body (8–15 items spanning the axis)
+  # strategy COMPANIONS (for human review; engine never reads them):
   keywords.csv           # query,volume_mo,maps_to,source  — REAL tool data
   ROLLOUT.md             # phases by demand, sampling %, refresh cadence
 ```
 
-Mirror `example-seed/` exactly for shape. Fill it with THIS client's real axis,
-real keyword volumes, and real facts.
+Mirror `example-seed/` exactly for shape (it ships the three ingested files;
+add `keywords.csv` for your client). Only `site.json` + `template.*.json` are
+strictly required to validate — but produce all five; the companions are how a
+human sanity-checks the axis before spending tokens.
 
 ## Self-check before you hand it back
 

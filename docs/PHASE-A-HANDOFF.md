@@ -5,8 +5,14 @@ ngaylanhthangtot, …) doing SEO strategy + template authoring. This document
 is the complete specification of (1) what you must produce, and (2) exactly
 what the engine accepts — field by field, gate by gate, as implemented. If
 you follow this doc, `scripts/validate-seed.ts` passes and the engine
-generates without surprises. Give this doc to the session verbatim (copy it
-into the site repo or paste the raw URL).
+generates without surprises.
+
+> **Handing this off:** the recommended vehicle is the self-contained bundle
+> [`site-repo-handoff/`](./site-repo-handoff/) — it wraps this contract with an
+> orientation README (live engine URL, tenant-slug rule, a manual self-check),
+> the authoring method, a worked example seed, and a copy-paste kickoff prompt.
+> Upload that whole folder to the site-repo session. This doc alone is still
+> fine if you only need the contract.
 
 The flow you are Phase A of:
 
@@ -35,14 +41,20 @@ strategy + demo pages   →   validate → load → jobs →  webhook → pull �
 
 ```
 seeds/<client>/
+  # ── the engine INGESTS these (validate-seed / load-seed read them) ──
   site.json               # {slug, name, domain}
   template.<key>.json     # §2 — the contract's core
   worklist.golden.json    # §3 — golden-set job body (or rely on a built-in enumerator)
+  # ── strategy COMPANIONS (travel with the drop for human review; engine never reads them) ──
   keywords.csv            # query,volume_mo,maps_to,source — REAL tool data, source named
   ROLLOUT.md              # phases by demand, sampling %, refresh cadence
 ```
 
-Acceptance = this passes in the engine repo:
+Only the first three are read by the engine; `validate-seed` requires
+`site.json` + at least one `template.*.json` (a `worklist*.json` is checked when
+present). `keywords.csv` and `ROLLOUT.md` are the strategist's evidence and plan
+— produce them (they're how a human sanity-checks the axis), but their absence
+won't fail validation. Acceptance = this passes in the engine repo:
 
 ```sh
 deno run --allow-read --config supabase/functions/deno.json \

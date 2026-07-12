@@ -1,16 +1,16 @@
 # Phase A hand-off contract
 
-> **Bundle snapshot** (site-repo handoff, 2026-07). Canonical source:
-> `docs/PHASE-A-HANDOFF.md` in the pSEO content-engine repo. This is the
-> **contract you must follow** — read `README.md` in this bundle first.
-
 **Audience: the Claude Code session working in a CLIENT SITE repo** (sochudao,
 ngaylanhthangtot, …) doing SEO strategy + template authoring. This document
 is the complete specification of (1) what you must produce, and (2) exactly
 what the engine accepts — field by field, gate by gate, as implemented. If
 you follow this doc, `scripts/validate-seed.ts` passes and the engine
-generates without surprises. Give this doc to the session verbatim (copy it
-into the site repo or paste the raw URL).
+generates without surprises.
+
+> **Bundle snapshot** (site-repo handoff, 2026-07). Canonical source:
+> `docs/PHASE-A-HANDOFF.md` in the pSEO content-engine repo. You're already
+> holding the full bundle — read its `README.md` first for the engine facts
+> (live URL, tenant-slug rule) and the self-check.
 
 The flow you are Phase A of:
 
@@ -39,14 +39,20 @@ strategy + demo pages   →   validate → load → jobs →  webhook → pull �
 
 ```
 seeds/<client>/
+  # ── the engine INGESTS these (validate-seed / load-seed read them) ──
   site.json               # {slug, name, domain}
   template.<key>.json     # §2 — the contract's core
   worklist.golden.json    # §3 — golden-set job body (or rely on a built-in enumerator)
+  # ── strategy COMPANIONS (travel with the drop for human review; engine never reads them) ──
   keywords.csv            # query,volume_mo,maps_to,source — REAL tool data, source named
   ROLLOUT.md              # phases by demand, sampling %, refresh cadence
 ```
 
-Acceptance = this passes in the engine repo:
+Only the first three are read by the engine; `validate-seed` requires
+`site.json` + at least one `template.*.json` (a `worklist*.json` is checked when
+present). `keywords.csv` and `ROLLOUT.md` are the strategist's evidence and plan
+— produce them (they're how a human sanity-checks the axis), but their absence
+won't fail validation. Acceptance = this passes in the engine repo:
 
 ```sh
 deno run --allow-read --config supabase/functions/deno.json \
