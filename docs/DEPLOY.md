@@ -211,14 +211,22 @@ A published item comes back as JSON. That round trip — generate → gate → r
 `prose-generate` also accepts `{ dry_run, template, input_data }` (service-role only),
 and batch actions `{ action: "submit_batch" | "collect_batch", job_id }`.
 
-### Migration `0009_channel_tokens`
+### Migrations `0009_anthropic_batch` + `0010_channel_tokens`
+
+Applied via migration repair on the linked project (DDL already live). Fresh envs:
 
 ```sh
-supabase db query --linked < supabase/migrations/0009_channel_tokens.sql
+npx supabase db push --linked
 ```
 
-Splits job token totals into `tokens_*_batch` / `tokens_*_sync` so Actual Cost
-can price mixed regen (sync) + batch spend correctly on job lists.
+Or one-off (legacy):
+
+```sh
+supabase db query --linked < supabase/migrations/0009_anthropic_batch.sql
+supabase db query --linked < supabase/migrations/0010_channel_tokens.sql
+```
+
+`0010` splits job token totals into `tokens_*_batch` / `tokens_*_sync` for mixed-channel Actual Cost.
 
 ---
 
