@@ -85,6 +85,11 @@ Deno.test('buildComboInput computes the authoritative fact-set', () => {
   assertEquals(facts.linking, 4);
   assertEquals(facts.maturity, 1);
   assertEquals(facts.maturitySum, 10);
+  // K2: hub & sibling internal-link data
+  assertEquals(facts.hub, 'so-chu-dao-7');
+  assert(Array.isArray(facts.siblings) && (facts.siblings as string[]).length === 4);
+  assert((facts.siblings as string[]).every((s) => /^so-chu-dao-7-su-menh-\d+$/.test(s)));
+  assert(!(facts.siblings as string[]).includes('so-chu-dao-7-su-menh-3')); // excludes self
   assertThrows(() => buildComboInput('not-a-combo-key'));
 });
 
