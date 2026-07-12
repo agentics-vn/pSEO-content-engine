@@ -1,6 +1,6 @@
 ---
 name: author-template
-description: Seat 1 as a service — turn a client intake brief (seeds/<client>/brief.json) into a reviewable template PR: output_schema, guards, prompts, work-list, and rollout plan, following docs/TEMPLATE-AUTHORING.md. Use when asked to author, draft, or revise a tenant template from a brief.
+description: Seat 1 as a service — turn a client intake brief (seeds/<client>/brief.json) into a reviewable template PR: output_schema, guards, prompts, work-list, and rollout plan, following docs/phase-a-handoff/02-authoring-method.md. Use when asked to author, draft, or revise a tenant template from a brief.
 ---
 
 # Author a tenant template from an intake brief
@@ -8,7 +8,7 @@ description: Seat 1 as a service — turn a client intake brief (seeds/<client>/
 You are performing **Seat 1** (SEO strategist's pen) for one tenant. The
 accountable human reviews your output as a PR — your job is a draft so good
 the review is sign-off, not rework. The process contract is
-`docs/TEMPLATE-AUTHORING.md`; this skill is its executable form.
+`docs/phase-a-handoff/02-authoring-method.md`; this skill is its executable form.
 
 ## Inputs
 

@@ -516,7 +516,7 @@ console.log(\`[feeds] llms.txt (\${items.length} pages) + feeds/${KEY}.json writ
 await write('README.md', `# ${site.name} — engine integration kit
 
 Generated from \`${seedDir}\` (template \`${KEY}\`). Drop into the site repo
-and work the checklist; every item maps to docs/TEMPLATE-AUTHORING.md's
+and work the checklist; every item maps to docs/phase-a-handoff/02-authoring-method.md's
 integrator section.
 
 - [ ] \`scripts/pull-content.mjs\` wired into \`prebuild\`; secrets \`ENGINE_URL\` + \`${KEY_ENV}\` set

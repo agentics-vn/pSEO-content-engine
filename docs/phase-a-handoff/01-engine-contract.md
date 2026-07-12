@@ -7,10 +7,10 @@ what the engine accepts — field by field, gate by gate, as implemented. If
 you follow this doc, `scripts/validate-seed.ts` passes and the engine
 generates without surprises.
 
-> **Bundle snapshot** (site-repo handoff, 2026-07). Canonical source:
-> `docs/PHASE-A-HANDOFF.md` in the pSEO content-engine repo. You're already
-> holding the full bundle — read its `README.md` first for the engine facts
-> (live URL, tenant-slug rule) and the self-check.
+> This is the **contract** file of the Phase A handoff package (this folder).
+> Read [`README.md`](./README.md) first for the engine facts (live URL,
+> tenant-slug rule) and the self-check; the authoring *method* is
+> [`02-authoring-method.md`](./02-authoring-method.md).
 
 The flow you are Phase A of:
 

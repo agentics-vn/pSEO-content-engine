@@ -27,11 +27,12 @@ C. SITE REPO (already integrated — the demo pages became the components)
    pull-and-throw script re-pulls → build renders published pages
 ```
 
-**The full Phase A specification — what to produce and exactly what the
-engine accepts — is [`PHASE-A-HANDOFF.md`](./PHASE-A-HANDOFF.md). To hand this
-to a Claude Code session in a client site repo, upload the self-contained
-bundle [`site-repo-handoff/`](./site-repo-handoff/) (orientation + the contract
-+ the method + a worked example + a copy-paste kickoff prompt).**
+**The full Phase A specification — what to produce and exactly what the engine
+accepts — lives in the self-contained package
+[`phase-a-handoff/`](./phase-a-handoff/) (orientation README + the engine
+contract + the authoring method + a worked example + a copy-paste kickoff
+prompt). Upload that whole folder to the Claude Code session in the client site
+repo.**
 
 The critical trick in phase A: **write the 2–3 demo pages against
 engine-shaped data** (a hand-authored `output` row matching the schema, in a

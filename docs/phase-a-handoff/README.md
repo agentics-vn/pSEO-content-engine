@@ -132,7 +132,7 @@ Give this to the fresh site-repo session along with this bundle:
 
 ```
 You are doing Phase A for programmatic SEO in this site repo. Read
-docs/site-repo-handoff/README.md, then 01-engine-contract.md and
+docs/phase-a-handoff/README.md, then 01-engine-contract.md and
 02-authoring-method.md, then study example-seed/ as a template.
 
 Produce: (1) 3–5 demo pages rendered from hand-written engine-shaped data
