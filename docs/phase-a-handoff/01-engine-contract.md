@@ -113,7 +113,7 @@ Severity: `"fail"` blocks approve/publish (hard, non-overridable in review);
 |---|---|---|---|
 | `schema` | item | `{severity}` | structural mirror of strict mode (missing/extra/mistyped fields) |
 | `unicode` | item | `{form: "NFC"}` | every string must equal its NFC normalization |
-| `length` | item | `{fields: {field: [min,max]}}` | Unicode **code points** (correct for Vietnamese); a missing field counts as a violation. A key may be `field.N` to bound **element N** of an array-of-strings field (e.g. `"phanTich.0": [120,700]`) |
+| `length` | item | `{fields: {field: [min,max]}}` | Unicode **code points** (correct for Vietnamese). **Asymmetric severity:** under-`min` or a missing field is a hard **`fail`** (thin/absent content blocks approve); over-`max` alone is a soft **`flag`** (non-blocking overflow that still routes to review — set `max` for the SERP-truncation fields like `seoTitle`/`metaDescription` you actually want a reviewer to trim). A key may be `field.N` to bound **element N** of an array-of-strings field (e.g. `"phanTich.0": [120,700]`) |
 | `required_mentions` | item | `{rules: [{field, must_contain: ["{token}", …]}]}` | substring match AFTER `{token}` resolution from input_data — e.g. `"{price_buy_fmt}"` → `"8.450.000"` must appear in the field |
 | `banned_phrases` | item | `{list: […]}` | case-insensitive substring across ALL string fields |
 | `numeric_consistency` | item | `{computed: [inputDataFields]}` | ⚠️ matches 1–2 digit integers **0–33** in prose and requires each to appear among the named input_data values. Built for small-integer domains (numerology). **For prices/dates/big numbers: OMIT this gate** and enforce fidelity via `required_mentions` on pre-formatted strings carried in input_data |
