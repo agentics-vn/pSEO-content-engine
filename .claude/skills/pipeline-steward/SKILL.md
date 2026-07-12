@@ -31,7 +31,7 @@ SUPABASE_URL        engine project URL (for auth)
 SUPABASE_ANON_KEY   engine anon key (for auth)
 AGENT_EMAIL         steward login (site_admins role: editor, every site)
 AGENT_PASSWORD      steward password
-STEWARD_SITES       csv of site slugs, e.g. "sochumenh,giavang24h"
+STEWARD_SITES       csv of site slugs, e.g. "sochumenh,<other-site>"
 REFRESH_AUTOPILOT   optional; "true" enables auto-created regenerate jobs
 ```
 

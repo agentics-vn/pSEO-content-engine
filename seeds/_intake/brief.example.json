@@ -1,57 +1,57 @@
 {
-  "_comment": "Client intake brief — the ONLY per-tenant input Seat 1 needs. Copy to seeds/<client>/brief.json, fill it with the client, then run the author-template skill. Fields marked (human) cannot be invented by an agent and must come from real tools or the client.",
+  "_comment": "Client intake brief — the ONLY per-tenant input Seat 1 needs. Copy to seeds/<client>/brief.json, fill every <...> placeholder with the real client, then run the author-template skill. Fields marked (human) cannot be invented by an agent and must come from real tools or the client.",
 
   "client": {
-    "name": "Giá Vàng 24h",
-    "site_slug": "giavang24h",
-    "domain": "giavang24h.vn",
+    "name": "<Client name>",
+    "site_slug": "<client>",
+    "domain": "<client>.vn",
     "language": "vi",
-    "product": "price-alert subscription",
-    "cta": "Đăng ký nhận cảnh báo giá"
+    "product": "<what the site sells / the conversion, e.g. a subscription or booking>",
+    "cta": "<call-to-action label>"
   },
 
   "axis": {
-    "_comment": "(human) The enumerable data axis behind the pages. No axis → decline.",
-    "unit": "city × metal type",
-    "enumeration": "63 provinces × {SJC, nhẫn 9999}",
-    "facts_source": "client's price API, refreshed daily",
-    "fact_fields": ["city", "metal", "price_buy", "price_sell", "delta_24h", "updated_at"]
+    "_comment": "(human) The enumerable data axis behind the pages — a city, a product, a date, a number/spec pair. No axis → decline. The unit below is illustrative; replace with the client's real axis.",
+    "unit": "<axis unit, e.g. city × category>",
+    "enumeration": "<how it enumerates, e.g. 63 provinces × N categories>",
+    "facts_source": "<real per-page fact source, e.g. the client's API / dataset>",
+    "fact_fields": ["<fact_field_1>", "<fact_field_2>", "<...>"]
   },
 
   "keywords": {
-    "_comment": "(human) Real query data — export from Keyword Planner / GSC / Ahrefs. Sample rows here; full CSV alongside as keywords.csv.",
-    "head_term": "giá vàng hôm nay",
+    "_comment": "(human) Real query data — export from Keyword Planner / GSC / Ahrefs. Sample rows show the format only; put the full CSV alongside as keywords.csv.",
+    "head_term": "<primary head keyword>",
     "sample": [
-      { "query": "giá vàng hôm nay hà nội", "volume_mo": 40000, "maps_to": "gia-vang-sjc-ha-noi" },
-      { "query": "giá vàng nhẫn 9999 đà nẵng", "volume_mo": 5400, "maps_to": "gia-vang-nhan-da-nang" }
+      { "query": "<head keyword> <axis value 1>", "volume_mo": 40000, "maps_to": "<slug-1>" },
+      { "query": "<head keyword> <axis value 2>", "volume_mo": 5400, "maps_to": "<slug-2>" }
     ]
   },
 
   "serp_refs": {
     "_comment": "Top-ranking URLs for 3–5 target queries; the agent reads these to derive the schema.",
-    "urls": ["https://example-competitor-1.vn/gia-vang-ha-noi", "https://example-competitor-2.vn/..."]
+    "urls": ["<competitor URL 1>", "<competitor URL 2>"]
   },
 
   "hub_and_spoke": {
-    "hub_pages": ["/gia-vang/ (head term — hand-written in site repo)", "/gia-vang/<metal>/ (per-metal hubs)"],
-    "sibling_rule": "each city page links to 3 nearest provinces, same metal"
+    "hub_pages": ["/<hub>/ (head term — hand-written in site repo)", "/<hub>/<facet>/ (per-facet hubs)"],
+    "sibling_rule": "<how each spoke picks its 3–4 siblings, e.g. 3 nearest by same category>"
   },
 
   "voice": {
-    "persona": "a calm market analyst, not a hype channel",
-    "tone": "factual, ngắn gọn, không giật tít",
-    "do_not": ["dự đoán giá chắc chắn", "khuyến nghị đầu tư", "so sánh nhà vàng cụ thể tiêu cực"]
+    "persona": "<who is speaking, e.g. a calm domain expert, not a hype channel>",
+    "tone": "<tone, e.g. factual, ngắn gọn, không giật tít>",
+    "do_not": ["<voice DO-NOT 1>", "<voice DO-NOT 2>"]
   },
 
   "compliance": {
     "_comment": "(human) Legal/brand red lines → banned_phrases guard.",
-    "banned_phrases": ["chắc chắn tăng", "chắc chắn giảm", "cam kết lợi nhuận", "nên mua ngay"]
+    "banned_phrases": ["<banned phrase 1>", "<banned phrase 2>"]
   },
 
   "rollout": {
-    "golden_set": "8 cities across regions + both metals, review_sample_pct 100",
-    "phase_1": "top-20 cities by volume",
-    "phase_2": "remainder",
-    "refresh": "daily price rows re-posted (hash regenerates); prose refresh quarterly via template_version"
+    "golden_set": "<golden-set scope, e.g. 8–15 items spanning the axis, review_sample_pct 100>",
+    "phase_1": "<first batch, e.g. top-20 by volume>",
+    "phase_2": "<remainder>",
+    "refresh": "<refresh cadence, e.g. facts re-posted on change (hash regenerates); prose refresh via template_version>"
   }
 }

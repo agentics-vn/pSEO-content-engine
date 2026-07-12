@@ -15,7 +15,7 @@ this order:
 | **`README.md`** (this file) | Orientation, engine facts, definition of done, kickoff prompt |
 | **`01-engine-contract.md`** | **The contract you must follow** — field-by-field, gate-by-gate what the engine accepts. Authoritative. |
 | **`02-authoring-method.md`** | The method — how a strategist decides the axis, hub&spoke, schema, guards, prompts |
-| **`example-seed/`** | A complete, valid worked example (`giavang24h` — gold-price-by-province). Copy its shape. |
+| **`example-seed/`** | A **real** reference seed — the live `sochumenh` tenant (`site.json` + the combo template). Copy its shape; **adapt, don't clone** (your client's axis, queries, and voice differ). It uses the built-in combo-grid enumerator, so it ships no explicit `worklist.golden.json` — for that shape see `01` §3. |
 | **`example-pull-script.mjs`** | Reference build-time pull script (Phase C) — shows the envelope your demo pages must imitate |
 
 When `01` and `02` disagree with anything here, **`01` wins on the contract**;
@@ -82,10 +82,13 @@ seeds/<client>/
   ROLLOUT.md             # phases by demand, sampling %, refresh cadence
 ```
 
-Mirror `example-seed/` exactly for shape (it ships the three ingested files;
-add `keywords.csv` for your client). Only `site.json` + `template.*.json` are
-strictly required to validate — but produce all five; the companions are how a
-human sanity-checks the axis before spending tokens.
+Mirror `example-seed/` for the shape of `site.json` and `template.<key>.json`
+(the real `sochumenh` template shows a full `output_schema` + `guards` + prompts).
+It relies on the combo-grid enumerator, so add your own explicit
+`worklist.golden.json` (shape in `01` §3) plus `keywords.csv` and `ROLLOUT.md`.
+Only `site.json` + `template.*.json` are strictly required to validate — but
+produce the companions too; they're how a human sanity-checks the axis before
+spending tokens.
 
 ## Self-check before you hand it back
 

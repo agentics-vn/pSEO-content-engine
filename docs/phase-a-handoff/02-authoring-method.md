@@ -34,9 +34,12 @@ Planner / GSC of an existing property / Ahrefs). The strategist's first
 deliverable is a spreadsheet mapping **query pattern → axis value**:
 
 ```
-"số chủ đạo 7 sứ mệnh 3"   → combo(7,3)      170/mo
-"giá vàng hôm nay hà nội"  → city(hà nội)   40k/mo
+"số chủ đạo 7 sứ mệnh 3"      → combo(7,3)         170/mo
+"ngày tốt khai trương tháng 7" → ngày(2026-07-…)    50k/mo
 ```
+
+(The axis can be any enumerable type — a number pair, a date, a city, a spec —
+as long as real facts back every value.)
 
 Rules:
 - The axis must be enumerable and backed by computable facts (§2). No axis →
