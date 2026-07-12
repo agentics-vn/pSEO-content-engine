@@ -146,8 +146,11 @@ const deps: AdminDeps = {
     return data;
   },
   async getPendingItemIds(jobId, limit) {
+    // K1: highest search-demand first, then a stable key order.
     const { data, error } = await supabase.from('prose_items')
-      .select('id').eq('job_id', jobId).eq('status', 'pending').limit(limit);
+      .select('id').eq('job_id', jobId).eq('status', 'pending')
+      .order('priority', { ascending: false }).order('item_key', { ascending: true })
+      .limit(limit);
     if (error) throw error;
     return (data ?? []).map((r) => r.id as string);
   },

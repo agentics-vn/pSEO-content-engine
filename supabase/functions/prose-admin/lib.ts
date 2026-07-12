@@ -50,11 +50,19 @@ export interface JobInput {
    * backend (or a CSV import in the admin UI) supplies the structured data
    * each page stands on, and the engine hashes it into the cache key.
    */
-  items?: Array<{ item_key: string; input_data: Record<string, unknown> }>;
+  items?: Array<{ item_key: string; input_data: Record<string, unknown>; priority?: number }>;
   /** Convenience for keys resolvable by a built-in input builder (combo axis). */
   item_keys?: string[];
   /** 'combo-grid' enumerates the full 12×12 axis minus already-published. */
   enumerate?: 'combo-grid';
+  /**
+   * K1: search-demand priority per item_key (higher = built/reviewed first).
+   * Real query volumes are strategy data the engine never invents — the operator
+   * derives these from keywords.csv (see scripts/keywords-to-worklist.mjs) and
+   * passes them in; the drain orders by priority DESC. Applies to the
+   * item_keys/enumerate paths; explicit `items` rows may also set `priority`.
+   */
+  priorities?: Record<string, number>;
   filter?: {
     master?: 'exclude' | 'only';
     life_paths?: number[];
@@ -147,7 +155,7 @@ export interface AdminDeps {
   /** Insert pending items; ON CONFLICT (cache key) DO NOTHING. Returns rows inserted. */
   insertItems(rows: Array<{
     site_id: string; job_id: string; template_key: string; template_version: number;
-    item_key: string; data_hash: string; input_data: unknown; status: string;
+    item_key: string; data_hash: string; input_data: unknown; status: string; priority?: number;
   }>): Promise<number>;
   /**
    * Regenerate: reset EXISTING non-published rows for these item_keys (at this
@@ -423,15 +431,17 @@ export function makeAdminHandler(deps: AdminDeps, opts: { runBudgetMs?: number }
           created_by: userId,
         });
 
-        const rows = await Promise.all(workList.map(async ({ item_key, input_data }) => ({
+        const rows = await Promise.all(workList.map(async (w) => ({
           site_id: site.site_id,
           job_id: job.id,
           template_key: j.template_key,
           template_version: version,
-          item_key,
-          data_hash: await dataHash(input_data),
-          input_data,
+          item_key: w.item_key,
+          data_hash: await dataHash(w.input_data),
+          input_data: w.input_data,
           status: 'pending',
+          // K1: priority from the demand map, else a per-row value, else 0.
+          priority: j.priorities?.[w.item_key] ?? (w as { priority?: number }).priority ?? 0,
         })));
         const inserted = await deps.insertItems(rows);
 

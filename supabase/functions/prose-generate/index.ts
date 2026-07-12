@@ -156,8 +156,10 @@ const deps: BatchDeps = {
     return data;
   },
   async listPendingItems(jobId) {
+    // K1: build the batch in search-demand order (stable by key within a tier).
     const { data, error } = await supabase.from('prose_items')
-      .select('*').eq('job_id', jobId).eq('status', 'pending');
+      .select('*').eq('job_id', jobId).eq('status', 'pending')
+      .order('priority', { ascending: false }).order('item_key', { ascending: true });
     if (error) throw error;
     return (data ?? []) as ItemRow[];
   },
