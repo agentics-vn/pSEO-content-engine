@@ -7,6 +7,7 @@ export interface GateResult {
 
 export interface ReviewItem {
   id: string;
+  job_id?: string | null;
   item_key: string;
   template_key: string;
   template_version: number;

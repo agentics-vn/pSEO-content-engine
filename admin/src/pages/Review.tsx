@@ -2,9 +2,25 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { DataSource, JobRow, ReviewItem } from '../types';
 import { gatesOf, prettyKey } from '../lib/format';
 import { navigate } from '../router';
-import { GateList, ItemTitle, OutputPreview, ReviewListItem, StatusPill } from '../components/proseBits';
+import { GateList, OutputPreview, ReviewListItem, StatusPill } from '../components/proseBits';
 
-const STATUSES = ['', 'generated', 'flagged', 'approved', 'rejected', 'failed_validation'] as const;
+type Filter = 'review' | 'all' | 'pending' | 'generated' | 'flagged' | 'failed_validation' | 'approved' | 'rejected';
+
+const FILTERS: { id: Filter; label: string }[] = [
+  { id: 'review', label: 'Needs review' },
+  { id: 'failed_validation', label: 'Failed' },
+  { id: 'flagged', label: 'Flagged' },
+  { id: 'pending', label: 'Pending' },
+  { id: 'approved', label: 'Approved' },
+  { id: 'rejected', label: 'Rejected' },
+  { id: 'all', label: 'All' },
+];
+
+function matches(it: ReviewItem, f: Filter): boolean {
+  if (f === 'all') return true;
+  if (f === 'review') return ['generated', 'flagged', 'failed_validation'].includes(it.status);
+  return it.status === f;
+}
 
 export function ReviewPage({
   source,
@@ -17,95 +33,84 @@ export function ReviewPage({
 }) {
   const [job, setJob] = useState<JobRow | null>(null);
   const [items, setItems] = useState<ReviewItem[]>([]);
-  const [statusFilter, setStatusFilter] = useState('');
+  const [filter, setFilter] = useState<Filter>('review');
   const [idx, setIdx] = useState(0);
   const [editing, setEditing] = useState(false);
   const [editJson, setEditJson] = useState('');
-  const [rejectNote, setRejectNote] = useState('');
+  const [note, setNote] = useState('');
   const [showReject, setShowReject] = useState(false);
-  const [regenNote, setRegenNote] = useState('');
   const [showRegen, setShowRegen] = useState(false);
   const [busy, setBusy] = useState(false);
-  const idxRef = useRef(idx);
+  const idxRef = useRef(0);
   idxRef.current = idx;
 
-  const filterList = useCallback(
-    (list: ReviewItem[], status: string) =>
-      status ? list.filter((it) => it.status === status) : list,
-    [],
-  );
+  const filtered = items.filter((it) => matches(it, filter));
+  const current = filtered[Math.min(idx, Math.max(filtered.length - 1, 0))] ?? null;
+  const displayOutput = current?.edited_output ?? current?.output ?? null;
 
-  const reload = useCallback(async (opts?: { anchorItemId?: string }) => {
+  const reload = useCallback(async (anchorId?: string) => {
     const [jobRow, list] = await Promise.all([
       source.getJob(jobId),
       source.listItems({ job_id: jobId, limit: 200 }),
     ]);
     setJob(jobRow);
     setItems(list);
-    const fl = filterList(list, statusFilter);
     setIdx((prev) => {
-      if (opts?.anchorItemId) {
-        const i = fl.findIndex((it) => it.id === opts.anchorItemId);
+      if (anchorId) {
+        const nextList = list.filter((it) => matches(it, filter));
+        const i = nextList.findIndex((it) => it.id === anchorId);
         if (i >= 0) return i;
       }
-      return Math.min(prev, Math.max(0, fl.length - 1));
+      const len = list.filter((it) => matches(it, filter)).length;
+      return Math.min(prev, Math.max(0, len - 1));
     });
-  }, [source, jobId, statusFilter, filterList]);
+  }, [source, jobId, filter]);
 
   useEffect(() => { void reload(); }, [reload]);
 
-  const filtered = filterList(items, statusFilter);
-  const current = filtered[idx] ?? null;
-  const displayOutput = current?.edited_output ?? current?.output ?? null;
-
-  const selectIdx = useCallback((next: number) => {
-    setIdx(() => {
-      const len = filterList(items, statusFilter).length;
-      if (len === 0) return 0;
-      return ((next % len) + len) % len;
-    });
+  const selectIdx = (next: number) => {
+    if (filtered.length === 0) return;
+    setIdx(((next % filtered.length) + filtered.length) % filtered.length);
     setEditing(false);
     setShowReject(false);
     setShowRegen(false);
-  }, [items, statusFilter, filterList]);
+    setNote('');
+  };
 
   const approve = useCallback(async () => {
-    if (!current) return;
-    const anchor = current.id;
+    if (!current || busy) return;
     setBusy(true);
     const res = await source.approve(current.id);
     notify(res.ok ? `${prettyKey(current.item_key)} approved` : res.error ?? 'approve failed', !res.ok);
-    await reload({ anchorItemId: anchor });
+    await reload(current.id);
     setBusy(false);
-  }, [current, notify, reload, source]);
+  }, [busy, current, notify, reload, source]);
 
   const reject = useCallback(async () => {
-    if (!current) return;
-    const anchor = current.id;
+    if (!current || busy) return;
     setBusy(true);
-    const res = await source.reject(current.id, rejectNote || undefined);
+    const res = await source.reject(current.id, note || undefined);
     notify(res.ok ? 'Rejected' : res.error ?? 'reject failed', !res.ok);
     setShowReject(false);
-    setRejectNote('');
-    await reload({ anchorItemId: anchor });
+    setNote('');
+    await reload(current.id);
     setBusy(false);
-  }, [current, notify, rejectNote, reload, source]);
+  }, [busy, current, note, notify, reload, source]);
 
   const regen = useCallback(async () => {
-    if (!current) return;
+    if (!current || busy) return;
     if ((current.regen_count ?? 0) >= 3) {
       notify('Regen cap reached (3)', true);
       return;
     }
-    const anchor = current.id;
     setBusy(true);
-    const res = await source.regen(current.id, regenNote || undefined);
-    notify(res.ok ? 'Regeneration queued' : res.error ?? 'regen failed', !res.ok);
+    const res = await source.regen(current.id, note || undefined);
+    notify(res.ok ? 'Regenerating…' : res.error ?? 'regen failed', !res.ok);
     setShowRegen(false);
-    setRegenNote('');
-    await reload({ anchorItemId: anchor });
+    setNote('');
+    await reload(current.id);
     setBusy(false);
-  }, [current, notify, regenNote, reload, source]);
+  }, [busy, current, note, notify, reload, source]);
 
   const startEdit = useCallback(() => {
     if (!current) return;
@@ -113,7 +118,7 @@ export function ReviewPage({
     setEditing(true);
   }, [current, displayOutput]);
 
-  const saveEdit = useCallback(async () => {
+  const saveEdit = async () => {
     if (!current) return;
     let parsed: Record<string, unknown>;
     try {
@@ -122,31 +127,33 @@ export function ReviewPage({
       notify('Invalid JSON', true);
       return;
     }
-    const anchor = current.id;
     setBusy(true);
     const res = await source.edit(current.id, parsed);
-    notify(res.ok ? 'Saved edit' : res.error ?? 'edit failed', !res.ok);
+    notify(res.ok ? 'Saved' : res.error ?? 'edit failed', !res.ok);
     setEditing(false);
-    await reload({ anchorItemId: anchor });
+    await reload(current.id);
     setBusy(false);
-  }, [current, editJson, notify, reload, source]);
+  };
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (editing || showReject || showRegen) return;
+      if (editing || showReject || showRegen || busy) return;
       const t = e.target as HTMLElement;
-      if (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA') return;
+      if (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT') return;
       switch (e.key) {
         case 'j': selectIdx(idxRef.current + 1); break;
         case 'k': selectIdx(idxRef.current - 1); break;
         case 'a': void approve(); break;
+        case 'r': setShowReject(true); break;
         case 'e': startEdit(); break;
-        case 'r': setShowRegen(true); break;
+        case 'g': setShowRegen(true); break;
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [editing, showReject, showRegen, selectIdx, approve, startEdit]);
+  }, [editing, showReject, showRegen, busy, approve, startEdit, filtered.length]);
+
+  const count = (f: Filter) => items.filter((it) => matches(it, f)).length;
 
   return (
     <>
@@ -154,7 +161,7 @@ export function ReviewPage({
         <div className="hello">
           <h1>Review</h1>
           <p>
-            Job <code>{jobId.slice(0, 8)}</code>
+            <code>{jobId.slice(0, 8)}</code>
             {job && <> · {job.template} · {job.item_count} items · {job.status}</>}
           </p>
         </div>
@@ -162,35 +169,31 @@ export function ReviewPage({
         <button type="button" className="btn-ghost" onClick={() => navigate({ page: 'jobs' })}>← Jobs</button>
       </div>
 
-      <div className="review-toolbar card">
-        <label>
-          Status
-          <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setIdx(0); }}>
-            <option value="">All ({items.length})</option>
-            {STATUSES.filter(Boolean).map((s) => (
-              <option key={s} value={s}>{s} ({items.filter((it) => it.status === s).length})</option>
-            ))}
-          </select>
-        </label>
-        <span className="hint">j/k navigate · a approve · e edit · r regen</span>
+      <div className="filter-row">
+        {FILTERS.map((f) => (
+          <button
+            key={f.id}
+            type="button"
+            className={`chip${filter === f.id ? ' on' : ''}`}
+            onClick={() => { setFilter(f.id); setIdx(0); }}
+          >
+            {f.label} ({count(f.id)})
+          </button>
+        ))}
         <span className="grow" />
-        <span>{filtered.length ? `${idx + 1} / ${filtered.length}` : '0 items'}</span>
+        <span className="hint">j/k · a approve · r reject · e edit · g regen</span>
       </div>
 
       {!current ? (
-        <div className="card empty">No items match this filter.</div>
+        <div className="card empty">No items in this filter.</div>
       ) : (
         <div className="review-layout">
           <aside className="card review-list">
-            <div className="review-list-head">
-              <h2>Items</h2>
-              <span className="review-list-count">{filtered.length}</span>
-            </div>
             <ul className="review-items">
               {filtered.map((it, i) => (
                 <li key={it.id}>
-                  <button type="button" className={i === idx ? 'on' : ''} onClick={() => selectIdx(i)}>
-                    <ReviewListItem item={it} active={i === idx} />
+                  <button type="button" className={i === Math.min(idx, filtered.length - 1) ? 'on' : ''} onClick={() => selectIdx(i)}>
+                    <ReviewListItem item={it} active={i === Math.min(idx, filtered.length - 1)} />
                   </button>
                 </li>
               ))}
@@ -199,36 +202,40 @@ export function ReviewPage({
 
           <section className="card review-detail">
             <div className="review-detail-head">
-              <ItemTitle item={current} />
-              <StatusPill status={current.status} />
-              {current.regen_count != null && <span className="hint">regen {current.regen_count}/3</span>}
-            </div>
-            <div className="review-actions">
-              <button type="button" className="btn-yellow" disabled={busy} onClick={() => void approve()}>Approve (a)</button>
-              <button type="button" disabled={busy} onClick={() => setShowReject(true)}>Reject</button>
-              <button type="button" disabled={busy} onClick={startEdit}>Edit (e)</button>
-              <button type="button" disabled={busy || (current.regen_count ?? 0) >= 3} onClick={() => setShowRegen(true)}>Regen (r)</button>
-            </div>
-
-            {showReject && (
-              <div className="reject-box">
-                <label>Review note (optional)</label>
-                <input value={rejectNote} onChange={(e) => setRejectNote(e.target.value)} />
-                <div className="actions">
-                  <button type="button" className="btn-ghost" onClick={() => setShowReject(false)}>Cancel</button>
-                  <button type="button" className="btn-coral" disabled={busy} onClick={() => void reject()}>Confirm reject</button>
-                </div>
+              <div>
+                <b className="detail-title">{prettyKey(current.item_key)}</b>
+                <span className="meta">{current.template_key} v{current.template_version}
+                  {current.regen_count ? ` · regen ${current.regen_count}/3` : ''}
+                </span>
               </div>
-            )}
+              <StatusPill status={current.status} />
+            </div>
 
-            {showRegen && (
-              <div className="reject-box">
-                <label>Regen note (optional)</label>
-                <input value={regenNote} onChange={(e) => setRegenNote(e.target.value)} />
-                <div className="actions">
-                  <button type="button" className="btn-ghost" onClick={() => { setShowRegen(false); setRegenNote(''); }}>Cancel</button>
-                  <button type="button" className="btn-dark" disabled={busy} onClick={() => void regen()}>Confirm regen</button>
-                </div>
+            <div className="review-actions">
+              <button type="button" className="btn-yellow" disabled={busy} onClick={() => void approve()}>Approve</button>
+              <button type="button" className="btn-ghost" disabled={busy} onClick={() => { setShowReject(true); setShowRegen(false); }}>Reject</button>
+              <button type="button" className="btn-ghost" disabled={busy} onClick={startEdit}>Edit</button>
+              <button type="button" className="btn-ghost" disabled={busy || (current.regen_count ?? 0) >= 3}
+                onClick={() => { setShowRegen(true); setShowReject(false); }}>Regen</button>
+            </div>
+
+            {(showReject || showRegen) && (
+              <div className="note-box">
+                <input
+                  autoFocus
+                  placeholder={showReject ? 'Reject note (optional)' : 'Regen note (optional)'}
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') void (showReject ? reject() : regen());
+                    if (e.key === 'Escape') { setShowReject(false); setShowRegen(false); setNote(''); }
+                  }}
+                />
+                <button type="button" className="btn-ghost sm" onClick={() => { setShowReject(false); setShowRegen(false); setNote(''); }}>Cancel</button>
+                <button type="button" className={showReject ? 'btn-coral sm' : 'btn-dark sm'} disabled={busy}
+                  onClick={() => void (showReject ? reject() : regen())}>
+                  {showReject ? 'Reject' : 'Regen'}
+                </button>
               </div>
             )}
 
@@ -237,10 +244,10 @@ export function ReviewPage({
                 <h3>Output</h3>
                 {editing ? (
                   <>
-                    <textarea rows={16} className="code-input" value={editJson} onChange={(e) => setEditJson(e.target.value)} />
+                    <textarea rows={18} className="code-input" value={editJson} onChange={(e) => setEditJson(e.target.value)} />
                     <div className="actions">
                       <button type="button" className="btn-ghost" onClick={() => setEditing(false)}>Cancel</button>
-                      <button type="button" className="btn-dark" disabled={busy} onClick={() => void saveEdit()}>Save edit</button>
+                      <button type="button" className="btn-dark" disabled={busy} onClick={() => void saveEdit()}>Save</button>
                     </div>
                   </>
                 ) : (
@@ -250,12 +257,6 @@ export function ReviewPage({
               <div>
                 <h3>Gates</h3>
                 <GateList gates={gatesOf(current)} />
-                {current.input_data && (
-                  <>
-                    <h3>Input</h3>
-                    <OutputPreview output={current.input_data} />
-                  </>
-                )}
               </div>
             </div>
           </section>

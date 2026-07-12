@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { DataSource, JobRow, ReviewItem } from '../types';
 import { prettyKey } from '../lib/format';
-import { ItemTitle, StatusPill } from '../components/proseBits';
 
 export function PublishPage({
   source,
@@ -23,7 +22,6 @@ export function PublishPage({
     source.listItems(params).then(setItems);
     source.listJobs(30).then(setJobs);
     setSelected(new Set());
-    setFailures([]);
   };
   useEffect(() => { reload(); }, [source, jobFilter]);
 
@@ -43,10 +41,7 @@ export function PublishPage({
 
   const publishSelected = async () => {
     const ids = [...selected];
-    if (!ids.length) {
-      notify('Select items to publish', true);
-      return;
-    }
+    if (!ids.length) return;
     setBusy(true);
     const fails: { id: string; error: string }[] = [];
     let ok = 0;
@@ -61,45 +56,26 @@ export function PublishPage({
     setBusy(false);
   };
 
-  const publishOne = async (it: ReviewItem) => {
-    setBusy(true);
-    const res = await source.publish(it.id);
-    if (res.ok) notify(`${prettyKey(it.item_key)} published`);
-    else {
-      notify(res.error ?? 'publish failed', true);
-      setFailures([{ id: it.id, error: res.error ?? 'publish failed' }]);
-    }
-    reload();
-    setBusy(false);
-  };
-
   return (
     <>
       <div className="topbar">
         <div className="hello">
           <h1>Publish</h1>
-          <p>Push approved items live — consumers pull via content-api</p>
+          <p>Approved items → content-api</p>
         </div>
         <div className="grow" />
-        <button type="button" className="btn-dark" disabled={busy || selected.size === 0} onClick={publishSelected}>
+        <button type="button" className="btn-dark" disabled={busy || selected.size === 0} onClick={() => void publishSelected()}>
           Publish selected ({selected.size})
         </button>
       </div>
 
-      <div className="card publish-note">
-        <p>
-          After publish, items appear in <code>GET /v1/sites/{source.siteSlug}/published</code> on content-api.
-          Use your site API key from seed load.
-        </p>
-      </div>
-
       <div className="publish-toolbar card">
         <label>
-          Filter by job
+          Job
           <select value={jobFilter} onChange={(e) => setJobFilter(e.target.value)}>
-            <option value="">All approved (site-wide)</option>
+            <option value="">All approved</option>
             {jobs.map((j) => (
-              <option key={j.id} value={j.id}>{j.id.slice(0, 8)} — {j.template} ({j.item_count})</option>
+              <option key={j.id} value={j.id}>{j.id.slice(0, 8)} — {j.template}</option>
             ))}
           </select>
         </label>
@@ -110,7 +86,6 @@ export function PublishPage({
 
       {failures.length > 0 && (
         <div className="card publish-failures">
-          <h2>Failures</h2>
           <ul>
             {failures.map((f) => (
               <li key={f.id}><code>{f.id.slice(0, 8)}</code> — {f.error}</li>
@@ -120,21 +95,29 @@ export function PublishPage({
       )}
 
       <section className="card">
-        <h2>Approved items ({items.length})</h2>
-        <div className="rows">
-          {items.length === 0 && <div className="empty">Nothing approved yet.</div>}
+        <h2>{items.length} approved</h2>
+        <ul className="ops-list">
+          {items.length === 0 && <li className="empty">Nothing approved yet.</li>}
           {items.map((it) => (
-            <div className="row publish-row" key={it.id}>
+            <li key={it.id} className="ops-row">
               <label className="check">
                 <input type="checkbox" checked={selected.has(it.id)} onChange={() => toggle(it.id)} />
               </label>
-              <ItemTitle item={it} />
-              <StatusPill status={it.status} />
-              <div className="grow" />
-              <button type="button" className="btn-yellow" disabled={busy} onClick={() => publishOne(it)}>Publish</button>
-            </div>
+              <div className="ops-body">
+                <b>{prettyKey(it.item_key)}</b>
+                <span className="meta">{it.template_key} v{it.template_version}</span>
+              </div>
+              <button type="button" className="btn-yellow sm" disabled={busy} onClick={async () => {
+                setBusy(true);
+                const res = await source.publish(it.id);
+                notify(res.ok ? `${prettyKey(it.item_key)} published` : res.error ?? 'failed', !res.ok);
+                if (!res.ok) setFailures([{ id: it.id, error: res.error ?? 'publish failed' }]);
+                reload();
+                setBusy(false);
+              }}>Publish</button>
+            </li>
           ))}
-        </div>
+        </ul>
       </section>
     </>
   );
