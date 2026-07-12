@@ -23,3 +23,13 @@ export async function sha256Hex(input: string): Promise<string> {
 export async function dataHash(inputData: unknown): Promise<string> {
   return await sha256Hex(stableStringify(inputData));
 }
+
+/** HMAC-SHA256 hex of `message` under `secret` — the webhook body signature. */
+export async function hmacSha256Hex(secret: string, message: string): Promise<string> {
+  const key = await crypto.subtle.importKey(
+    'raw', new TextEncoder().encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'],
+  );
+  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(message));
+  return [...new Uint8Array(sig)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}

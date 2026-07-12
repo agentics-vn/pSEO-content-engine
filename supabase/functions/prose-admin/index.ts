@@ -5,6 +5,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { makeAdminHandler, type AdminDeps, type AdminItemRow } from './lib.ts';
+import { hmacSha256Hex } from '../_shared/hash.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
@@ -242,15 +243,18 @@ const deps: AdminDeps = {
 
   async getWebhooks(siteId) {
     const { data, error } = await supabase.from('site_webhooks')
-      .select('url').eq('site_id', siteId).is('revoked_at', null);
+      .select('url, secret').eq('site_id', siteId).is('revoked_at', null);
     if (error) throw error;
     return data ?? [];
   },
-  async fireWebhook(url, payload) {
+  async fireWebhook(url, payload, secret) {
+    const body = JSON.stringify(payload);
+    const headers: Record<string, string> = { 'content-type': 'application/json' };
+    if (secret) headers['x-signature'] = `sha256=${await hmacSha256Hex(secret, body)}`;
     await fetch(url, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(payload),
+      headers,
+      body,
       signal: AbortSignal.timeout(5000), // a slow consumer never blocks a publish
     }).catch(() => undefined); // nor does a failing one
   },

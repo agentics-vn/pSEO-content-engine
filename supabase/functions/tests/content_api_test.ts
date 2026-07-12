@@ -50,7 +50,7 @@ async function makeWorld() {
         (filter.sinceUpdatedAt === undefined || r.updated_at > filter.sinceUpdatedAt))),
     registerWebhook: (siteId, url) => {
       webhooks.push({ site_id: siteId, url });
-      return Promise.resolve({ id: `wh-${webhooks.length}` });
+      return Promise.resolve({ id: `wh-${webhooks.length}`, secret: `whsec-${webhooks.length}` });
     },
   };
   return { deps, webhooks, metricsWrites };

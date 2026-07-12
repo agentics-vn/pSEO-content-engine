@@ -195,8 +195,8 @@ export interface AdminDeps {
     processed?: number; remaining?: number; failures?: number; error?: string;
   }>;
 
-  getWebhooks(siteId: string): Promise<Array<{ url: string }>>;
-  fireWebhook(url: string, payload: unknown): Promise<void>;
+  getWebhooks(siteId: string): Promise<Array<{ url: string; secret: string }>>;
+  fireWebhook(url: string, payload: unknown, secret?: string): Promise<void>;
 
   /** Dashboard reads. */
   listJobs(siteId: string, limit: number): Promise<Array<Record<string, unknown>>>;
@@ -730,9 +730,16 @@ export function makeAdminHandler(deps: AdminDeps, opts: { runBudgetMs?: number }
             }
             await deps.updateItem(itemId, { status: 'published', updated_at: new Date().toISOString() });
             const hooks = await deps.getWebhooks(site.site_id);
-            await Promise.allSettled(hooks.map((h) =>
-              deps.fireWebhook(h.url, { site: site.slug, template: item.template_key, item_count: 1 }),
-            ));
+            // Enriched so a consumer knows WHAT changed (not just "something did")
+            // and can do an incremental pull; HMAC-signed per hook.
+            const payload = {
+              site: site.slug,
+              template: item.template_key,
+              template_version: item.template_version,
+              item_key: item.item_key,
+              item_count: 1,
+            };
+            await Promise.allSettled(hooks.map((h) => deps.fireWebhook(h.url, payload, h.secret)));
             return reply({ ok: true, status: 'published' });
           }
         }

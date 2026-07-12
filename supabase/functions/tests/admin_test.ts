@@ -262,7 +262,7 @@ function makeWorld(role: string = 'reviewer'): World {
       });
     },
 
-    getWebhooks: () => Promise.resolve([{ url: 'https://site.example/hook' }]),
+    getWebhooks: () => Promise.resolve([{ url: 'https://site.example/hook', secret: 'whsec_test' }]),
     fireWebhook: (url, payload) => {
       webhookCalls.push({ url, payload });
       return Promise.resolve();
@@ -421,7 +421,11 @@ Deno.test('publish requires approved, fires webhook, and published items are imm
   assertEquals(pub.status, 200);
   assertEquals(w.items.get(id)!.status, 'published');
   assertEquals(w.webhookCalls.length, 1);
-  assertEquals((w.webhookCalls[0].payload as { site: string }).site, 'sochumenh');
+  // W1a: payload identifies WHAT changed so a consumer can pull incrementally.
+  const wp = w.webhookCalls[0].payload as { site: string; template: string; item_key: string; template_version: number };
+  assertEquals(wp.site, 'sochumenh');
+  assertEquals(wp.item_key, w.items.get(id)!.item_key);
+  assertEquals(typeof wp.template_version, 'number');
 
   // One-way: edit and reject must refuse on a published item.
   assertEquals((await call(w.deps, 'POST', `/items/${id}/edit`, { edited_output: { intro: 'x' } })).status, 409);

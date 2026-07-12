@@ -61,9 +61,11 @@ const deps: ContentApiDeps = {
     return data?.length ?? 0;
   },
   async registerWebhook(siteId, url) {
+    // Omit `secret` from the upsert: on insert the column default mints one; on
+    // conflict the existing secret is preserved (re-registering doesn't rotate).
     const { data, error } = await supabase.from('site_webhooks')
       .upsert({ site_id: siteId, url, revoked_at: null }, { onConflict: 'site_id,url' })
-      .select('id').single();
+      .select('id, secret').single();
     if (error) throw error;
     return data;
   },
