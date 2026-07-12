@@ -67,7 +67,6 @@ function Login({ onReady }: { onReady: (s: DataSource) => void }) {
       <div className="login">
         <div className="brand"><IconSpark /><span style={{ fontSize: 16, fontWeight: 800 }}>pSEO.engine</span></div>
         <div className="card">
-          <p className="hint">Sign in with your engine admin account (site_admins membership). Engine endpoint is fixed; pick which tenant site to operate.</p>
           <div><label>Site slug</label><input value={f.siteSlug} onChange={set('siteSlug')} placeholder="sochumenh" /></div>
           <div><label>Email</label><input value={f.email} onChange={set('email')} autoComplete="username" /></div>
           <div><label>Password</label><input type="password" value={f.password} onChange={set('password')} autoComplete="current-password" /></div>
