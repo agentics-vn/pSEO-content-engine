@@ -7,6 +7,7 @@ import { assert, assertEquals, assertMatch, assertThrows } from './_assert.ts';
 import {
   buildComboInput,
   buildItemLlmRequest,
+  bumpMaxTokens,
   coerceToSchema,
   constraintNotes,
   estimateOutputTokens,
@@ -329,6 +330,13 @@ Deno.test('P3: sizedMaxTokens floors on schema length bounds, never below templa
   const { template } = await makeFakeWorld();
   assert(estimateOutputTokens(template) > 0);
   assert(sizedMaxTokens(template) >= template.max_tokens);
+  // Audit fix: an explicit max_tokens above the 16000 cap is honored, not lowered.
+  assertEquals(sizedMaxTokens({ ...template, max_tokens: 20000 }), 20000);
+});
+
+Deno.test('P1: bumpMaxTokens increases but never lowers', () => {
+  assert(bumpMaxTokens(4500) > 4500);
+  assertEquals(bumpMaxTokens(20000), 20000); // already above cap → unchanged, not shrunk
 });
 
 Deno.test('P1: isDegenerate catches stub shells, unresolved tokens, duplicate shells; passes real content', () => {

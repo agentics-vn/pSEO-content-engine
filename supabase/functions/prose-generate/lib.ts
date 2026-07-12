@@ -423,9 +423,17 @@ export function estimateOutputTokens(template: Pick<TemplateRow, 'guards'>): num
   return Math.ceil(tokens * 1.15);       // margin
 }
 
-/** Auto-sized output budget: never below the schema-derived floor, capped. */
+/** Auto-sized output budget: never below the template's explicit value, and the
+ *  cap bounds only the schema-derived estimate (so a template that deliberately
+ *  sets a very high max_tokens is honored, not silently lowered to the cap). */
 export function sizedMaxTokens(template: TemplateRow): number {
-  return Math.min(MAX_OUTPUT_TOKENS_CAP, Math.max(template.max_tokens, estimateOutputTokens(template)));
+  return Math.max(template.max_tokens, Math.min(MAX_OUTPUT_TOKENS_CAP, estimateOutputTokens(template)));
+}
+
+/** Bump a budget for a retry without ever lowering it (the cap can't shrink an
+ *  already-larger explicit budget). */
+export function bumpMaxTokens(current: number, factor = 1.7): number {
+  return Math.max(current, Math.min(MAX_OUTPUT_TOKENS_CAP, Math.round(current * factor)));
 }
 
 /**
@@ -576,11 +584,18 @@ export async function generateItem(deps: GenerateDeps, req: GenerateRequest): Pr
   // the gates fail it into the manual-regen queue. The wasted attempt is still
   // billed at job level.
   if (llmResult.stopReason === 'max_tokens' || isDegenerate(llmResult.output)) {
-    await deps.addJobUsage(item.job_id, llmResult.tokensIn, llmResult.tokensOut, 'sync');
-    const bumped = Math.min(MAX_OUTPUT_TOKENS_CAP, Math.round(llmReq.maxTokens * 1.7));
-    llmReq = buildItemLlmRequest(item, template, { maxTokensOverride: bumped });
+    const wasted = llmResult;
+    llmReq = buildItemLlmRequest(item, template, { maxTokensOverride: bumpMaxTokens(llmReq.maxTokens) });
     llmReq.temperature = Math.min(1, template.temperature + 0.2);
     llmResult = await deps.llm(llmReq);
+    // Fold the wasted attempt's tokens into the result so finalizeItemFromLlm
+    // bills BOTH attempts to the job accumulator AND the item row (one code path,
+    // no double-count).
+    llmResult = {
+      ...llmResult,
+      tokensIn: llmResult.tokensIn + wasted.tokensIn,
+      tokensOut: llmResult.tokensOut + wasted.tokensOut,
+    };
   }
 
   const { status, gates } = await finalizeItemFromLlm(deps, item, template, llmResult, {
@@ -745,9 +760,7 @@ export async function submitBatchJob(
     // P1: an item re-queued after a truncated/degenerate batch result gets a
     // bumped budget so the retry doesn't hit the same wall.
     const retry = Number((item.validation as { gen_retry?: unknown } | null)?.gen_retry ?? 0);
-    const override = retry > 0
-      ? Math.min(MAX_OUTPUT_TOKENS_CAP, Math.round(sizedMaxTokens(template) * (1 + 0.7 * retry)))
-      : undefined;
+    const override = retry > 0 ? bumpMaxTokens(sizedMaxTokens(template), 1 + 0.7 * retry) : undefined;
     const llmReq = buildItemLlmRequest(item, template, override ? { maxTokensOverride: override } : undefined);
     requests.push({ custom_id: item.id, params: toMessageParams(llmReq) });
   }
