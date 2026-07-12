@@ -577,8 +577,11 @@ export interface BatchDeps extends GenerateDeps {
   noteBatchFailure(item: ItemRow, error: string): Promise<void>;
 }
 
+/** Opaque Anthropic messages.create params — typed in index.ts where the SDK lives. */
+export type AnthropicMessageParams = object;
+
 export interface AnthropicBatchApi {
-  create(requests: Array<{ custom_id: string; params: Record<string, unknown> }>): Promise<{ id: string }>;
+  create(requests: Array<{ custom_id: string; params: AnthropicMessageParams }>): Promise<{ id: string }>;
   retrieve(batchId: string): Promise<{
     processing_status: string;
     request_counts?: {
@@ -621,7 +624,7 @@ export function llmResultFromBatchMessage(message: {
 export async function submitBatchJob(
   deps: BatchDeps,
   batchApi: AnthropicBatchApi,
-  toMessageParams: (req: LlmRequest) => Record<string, unknown>,
+  toMessageParams: (req: LlmRequest) => AnthropicMessageParams,
   jobId: string,
 ): Promise<{
   ok: boolean;
@@ -644,7 +647,7 @@ export async function submitBatchJob(
   }
 
   const templateCache = new Map<string, TemplateRow | null>();
-  const requests: Array<{ custom_id: string; params: Record<string, unknown> }> = [];
+  const requests: Array<{ custom_id: string; params: AnthropicMessageParams }> = [];
 
   for (const item of pending) {
     const tplKey = `${item.site_id}:${item.template_key}:${item.template_version}`;

@@ -37,7 +37,7 @@ export function modelAcceptsTemperature(model: string): boolean {
 }
 
 /** Shared params for sync messages.create and batch request params. */
-export function toAnthropicMessageParams(req: LlmRequest): Record<string, unknown> {
+export function toAnthropicMessageParams(req: LlmRequest): Anthropic.MessageCreateParamsNonStreaming {
   return {
     model: req.model,
     max_tokens: req.maxTokens,
@@ -47,18 +47,16 @@ export function toAnthropicMessageParams(req: LlmRequest): Record<string, unknow
     tools: [{
       name: 'emit_content',
       description: 'Nộp bài viết hoàn chỉnh theo đúng schema.',
-      input_schema: req.toolSchema,
+      input_schema: req.toolSchema as Anthropic.Tool['input_schema'],
       strict: true,
-    }],
+    } as Anthropic.Tool & { strict: true }],
     tool_choice: { type: 'tool', name: 'emit_content' },
   };
 }
 
 async function callAnthropic(req: LlmRequest): Promise<LlmResult> {
   if (!anthropic) throw new Error('ANTHROPIC_API_KEY is not set');
-  const response = await anthropic.messages.create(
-    toAnthropicMessageParams(req) as Parameters<typeof anthropic.messages.create>[0],
-  );
+  const response = await anthropic.messages.create(toAnthropicMessageParams(req));
 
   const toolUse = response.content.find(
     (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use' && b.name === 'emit_content',
@@ -79,7 +77,7 @@ const batchApi: AnthropicBatchApi = {
     const batch = await anthropic.messages.batches.create({
       requests: requests.map((r) => ({
         custom_id: r.custom_id,
-        params: r.params as Anthropic.MessageCreateParamsNonStreaming,
+        params: r.params as unknown as Anthropic.MessageCreateParamsNonStreaming,
       })),
     });
     return { id: batch.id };
