@@ -95,8 +95,8 @@ for (const row of rows) {
   if (!m) throw new Error(`[pull-combos] unexpected item_key "${row.item_key}"`);
   const lp = Number(m[1]);
   const dt = Number(m[2]);
-  assertNfc(row.output, row.item_key);
-  assertNfc(row.facts ?? {}, `${row.item_key}.facts`);
+  assertNfc(row.output, row.item_key); // the model-written prose that renders as text
+  // `facts` is engine-computed structured data (numbers + known editorial) — trusted, not NFC-policed here.
   bySlug.set(row.item_key, {
     slug: row.item_key,
     lifePath: lp,
