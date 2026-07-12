@@ -156,7 +156,7 @@ for every tenant.
 App: `pseo-content-engine` → `https://pseo-content-engine.fly.dev`  
 Org: `agentics-vn` · region: `sin` · static SPA via Caddy.
 
-**Auto-deploy:** push to `main` / default branch that touches `admin/**` runs
+**Auto-deploy:** push to `main` that touches `admin/**` runs
 [`.github/workflows/deploy-fly.yml`](../.github/workflows/deploy-fly.yml)
 (gate → `flyctl deploy ./admin`). Needs repo secret `FLY_API_TOKEN`
 (`fly tokens create deploy -a pseo-content-engine`). Manual:
