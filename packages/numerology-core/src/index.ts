@@ -9,9 +9,15 @@
  *      build time and THROW if the published prose ever drifts from them.
  *
  * If these two sides ever run different math, every page throws at build. That
- * is by design — but it means this package must be the ONLY implementation.
- * Ported verbatim from sochudao's astro/src/lib/numerology/core.ts + numbers.ts
- * (which named `packages/numerology-core` as its intended home).
+ * is by design — but it means the shared PRIMITIVES here (digit reduction,
+ * master-number preservation, maturity) must stay identical to the published
+ * chart library the sites actually use, `@csessh/sochumenh` (agentics-vn's own
+ * package). They are verified equal and pinned by `test/parity.csessh.test.ts`,
+ * so a change on either side turns CI red instead of silently drifting.
+ *
+ * The COMBO layer below (comboHarmony, linkingNumber, enumerateComboGrid,
+ * computeComboFacts) and the editorial NUMBER_FACTS are engine-specific — the
+ * chart library has no equivalent — so they live here and only here.
  */
 
 export * from './core.ts';
