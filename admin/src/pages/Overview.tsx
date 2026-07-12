@@ -22,10 +22,12 @@ export function Overview({
 
   const s = data.stats.items_by_status;
   const needsReview = (s.generated ?? 0) + (s.flagged ?? 0) + (s.failed_validation ?? 0);
-  const totalCost = data.jobs.reduce(
-    (sum, j) => sum + actualCostUsd(j.tokens_in, j.tokens_out, j.model),
-    0,
-  );
+  // Site-wide spend from /stats (all jobs), not just the recent jobs window.
+  // Model mix: price as Sonnet unless every recent job is Haiku.
+  const homeModel = data.jobs.length > 0 && data.jobs.every((j) => /haiku/i.test(j.model ?? ''))
+    ? 'claude-haiku'
+    : 'claude-sonnet';
+  const totalCost = actualCostUsd(data.stats.tokens_in, data.stats.tokens_out, homeModel);
   const runnable = data.jobs.filter((j) => j.status !== 'done');
   const queue = data.review.filter((it) =>
     ['generated', 'flagged', 'failed_validation'].includes(it.status),
