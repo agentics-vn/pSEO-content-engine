@@ -71,7 +71,9 @@ export function constraintNotes(schema: unknown, guards: Guards): string {
 
   const length = guards.length as { fields?: Record<string, [number, number]> } | undefined;
   for (const [field, [min, max]] of Object.entries(length?.fields ?? {})) {
-    lines.push(`- ${field}: ${min}–${max} ký tự`);
+    const el = /^(.+)\.(\d+)$/.exec(field); // "phanTich.0" → "phanTich (đoạn 1)"
+    const label = el ? `${el[1]} (đoạn ${Number(el[2]) + 1})` : field;
+    lines.push(`- ${label}: ${min}–${max} ký tự`);
   }
 
   // Array bounds from the ORIGINAL (un-stripped) schema.
@@ -102,6 +104,11 @@ export function constraintNotes(schema: unknown, guards: Guards): string {
   const banned = guards.banned_phrases as { list?: string[] } | undefined;
   if (banned?.list?.length) {
     lines.push(`- TUYỆT ĐỐI KHÔNG dùng các cụm: ${banned.list.map((p) => `"${p}"`).join(', ')}`);
+  }
+
+  const entity = guards.entity_consistency as { pattern?: string; allowed?: string[] } | undefined;
+  if (entity?.pattern && entity.allowed?.length) {
+    lines.push(`- CHỈ được nhắc tới các thực thể sau (lấy từ dữ kiện): ${entity.allowed.join('; ')}. TUYỆT ĐỐI KHÔNG bịa thực thể khác cùng loại.`);
   }
 
   if (lines.length === 0) return '';

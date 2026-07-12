@@ -113,12 +113,12 @@ Severity: `"fail"` blocks approve/publish (hard, non-overridable in review);
 |---|---|---|---|
 | `schema` | item | `{severity}` | structural mirror of strict mode (missing/extra/mistyped fields) |
 | `unicode` | item | `{form: "NFC"}` | every string must equal its NFC normalization |
-| `length` | item | `{fields: {field: [min,max]}}` | Unicode **code points** (correct for Vietnamese); a missing field counts as a violation |
+| `length` | item | `{fields: {field: [min,max]}}` | Unicode **code points** (correct for Vietnamese); a missing field counts as a violation. A key may be `field.N` to bound **element N** of an array-of-strings field (e.g. `"phanTich.0": [120,700]`) |
 | `required_mentions` | item | `{rules: [{field, must_contain: ["{token}", …]}]}` | substring match AFTER `{token}` resolution from input_data — e.g. `"{price_buy_fmt}"` → `"8.450.000"` must appear in the field |
 | `banned_phrases` | item | `{list: […]}` | case-insensitive substring across ALL string fields |
 | `numeric_consistency` | item | `{computed: [inputDataFields]}` | ⚠️ matches 1–2 digit integers **0–33** in prose and requires each to appear among the named input_data values. Built for small-integer domains (numerology). **For prices/dates/big numbers: OMIT this gate** and enforce fidelity via `required_mentions` on pre-formatted strings carried in input_data |
 | `faq_shape` | item | `{count, answers_must_contain: ["{token}"]}` | exactly `count` faqs, each with string q/a; every token must appear in ≥1 answer |
-| `entity_consistency` | item | `{note}` | reserved: currently reviewer guidance shown in the queue, not auto-checked |
+| `entity_consistency` | item | `{pattern, allowed, severity?}` | **auto-checks** invented entities: every match of `pattern` (a regex, e.g. a Can+Chi pair) in the prose must appear in `allowed` — the entity strings legit for this item, resolved from input_data like `required_mentions` (e.g. `["{dayCanChi}","{monthCanChi}","{yearCanChi}"]`). Any match not in `allowed` → violation. A config with only `{note}` (no `pattern`) stays a passive reviewer note. Regex `pattern` should avoid `{n}` quantifiers (guard-token resolution) |
 | `similarity` | batch | `{max_pairwise: 0.55}` | TF-IDF char-3-gram cosine across the job; items over threshold flagged (healthy batch: max ≈ 0.55, avg ≈ 0.43) |
 | `phrase_frequency` | batch | `{max_shared: 2}` | first-sentence opening n-gram, digits collapsed (so "số 7…" and "số 4…" stamp alike); openings shared by more items get flagged |
 
