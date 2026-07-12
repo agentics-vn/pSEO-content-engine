@@ -66,6 +66,13 @@ Prints a read-only, site-scoped API key once → goes into the client site's
 build secrets. Add their reviewers to `site_admins` (`editor` builds
 templates/jobs, `reviewer` approves/publishes, `owner` = both).
 
+> For the concrete, project-specific version of these commands against the live
+> engine (deploy, secrets, admin login, seed load, smoke test) see
+> [`DEPLOY.md`](./DEPLOY.md). **Note on names:** the `site.json` `slug` is the
+> engine tenant id and is independent of the client's repo name — e.g. the
+> `sochudao` repo (`consumers/sochudao/`) powers the `sochumenh` tenant
+> (`sochumenh.vn`). Keep the slug stable; it's baked into every API key and URL.
+
 > **Productized path:** collect `seeds/<client>/brief.json` (copy
 > `seeds/_intake/brief.example.json`), then run the `author-template` skill —
 > it executes steps 2–3 as a reviewable PR (schema, guards, prompts, golden
