@@ -338,6 +338,8 @@ export interface LlmResult {
   output: unknown;
   tokensIn: number;
   tokensOut: number;
+  /** Anthropic stop_reason; 'max_tokens' means the output was truncated. */
+  stopReason?: string;
 }
 
 export interface GenerateDeps {
@@ -368,13 +370,73 @@ export interface DryRunRequest {
   item_key?: string;
 }
 
+/** Ceiling for auto-sized and retry-bumped output budgets (well under model caps). */
+export const MAX_OUTPUT_TOKENS_CAP = 16000;
+
+const STUB_MARKERS = ['placeholder', 'lorem ipsum', 'tbd', 'todo', 'n/a', 'xxx'];
+
+/**
+ * Cheap detector for a bailed generation: the model filled the forced tool with
+ * stub values (the observed "placeholder"×12 failure), left an unresolved
+ * {token}, or nearly every string field is identical. Not a quality judge — it
+ * only catches degenerate shells so P1 can retry them instead of burning a
+ * review slot.
+ */
+export function isDegenerate(output: unknown): boolean {
+  if (!output || typeof output !== 'object') return true;
+  const strings: string[] = [];
+  const walk = (v: unknown): void => {
+    if (typeof v === 'string') strings.push(v);
+    else if (Array.isArray(v)) v.forEach(walk);
+    else if (v && typeof v === 'object') Object.values(v).forEach(walk);
+  };
+  walk(output);
+  if (strings.length === 0) return true;
+  let stubbed = 0;
+  for (const s of strings) {
+    if (/\{[a-zA-Z_][a-zA-Z0-9_.]*\}/.test(s)) return true; // unresolved {token} leaked into output
+    if (STUB_MARKERS.includes(s.trim().toLowerCase())) stubbed++;
+  }
+  if (stubbed >= 2) return true;
+  const distinct = new Set(strings.map((s) => s.trim()));
+  if (strings.length >= 4 && distinct.size <= 2) return true; // near-all-identical shell
+  return false;
+}
+
+/**
+ * Floor the per-item output budget on the template's OWN length bounds so a flat
+ * max_tokens can't truncate a long schema. Σ(field max code points) + FAQ + JSON
+ * overhead, converted at a conservative chars/token ratio, + margin. The caller
+ * takes max(template.max_tokens, this) — a generous ceiling costs nothing (you
+ * pay for tokens produced, not the cap).
+ */
+export function estimateOutputTokens(template: Pick<TemplateRow, 'guards'>): number {
+  const lengthFields = (template.guards?.length as { fields?: Record<string, [number, number]> } | undefined)?.fields ?? {};
+  let chars = 0;
+  for (const bounds of Object.values(lengthFields)) {
+    if (Array.isArray(bounds) && typeof bounds[1] === 'number') chars += bounds[1];
+  }
+  const faq = template.guards?.faq_shape as { count?: number } | undefined;
+  chars += (faq?.count ?? 0) * 700; // q + a per faq, generous
+  chars += 600;                     // JSON keys/braces + fields without a length bound
+  const tokens = Math.ceil(chars / 1.3); // ~1.3 chars/token, conservative for Vietnamese
+  return Math.ceil(tokens * 1.15);       // margin
+}
+
+/** Auto-sized output budget: never below the schema-derived floor, capped. */
+export function sizedMaxTokens(template: TemplateRow): number {
+  return Math.min(MAX_OUTPUT_TOKENS_CAP, Math.max(template.max_tokens, estimateOutputTokens(template)));
+}
+
 /**
  * Build the LLM request for one item: constraint notes, few-shots, strict schema.
- * Shared by sync generate, batch submit, and dry-run.
+ * Shared by sync generate, batch submit, and dry-run. `maxTokensOverride` lets
+ * P1 re-issue a truncated item with a bumped budget.
  */
 export function buildItemLlmRequest(
   item: Pick<ItemRow, 'item_key' | 'input_data'>,
   template: TemplateRow,
+  opts?: { maxTokensOverride?: number },
 ): LlmRequest {
   const notes = constraintNotes(template.output_schema, template.guards);
   const withNotes = template.user_template.includes('{constraint_notes}')
@@ -397,7 +459,7 @@ export function buildItemLlmRequest(
     userPrompt,
     toolSchema: stripForStrict(template.output_schema) as Record<string, unknown>,
     temperature: template.temperature,
-    maxTokens: template.max_tokens,
+    maxTokens: opts?.maxTokensOverride ?? sizedMaxTokens(template),
   };
 }
 
@@ -506,8 +568,21 @@ export async function generateItem(deps: GenerateDeps, req: GenerateRequest): Pr
     return { ok: false, error: `template ${item.template_key} v${item.template_version} not found` };
   }
 
-  const llmReq = buildItemLlmRequest(item, template);
-  const llmResult = await deps.llm(llmReq);
+  let llmReq = buildItemLlmRequest(item, template);
+  let llmResult = await deps.llm(llmReq);
+
+  // P1: a truncated (max_tokens) or degenerate (stub/duplicate shell) result is
+  // the dominant failure at scale — retry ONCE with more headroom before letting
+  // the gates fail it into the manual-regen queue. The wasted attempt is still
+  // billed at job level.
+  if (llmResult.stopReason === 'max_tokens' || isDegenerate(llmResult.output)) {
+    await deps.addJobUsage(item.job_id, llmResult.tokensIn, llmResult.tokensOut, 'sync');
+    const bumped = Math.min(MAX_OUTPUT_TOKENS_CAP, Math.round(llmReq.maxTokens * 1.7));
+    llmReq = buildItemLlmRequest(item, template, { maxTokensOverride: bumped });
+    llmReq.temperature = Math.min(1, template.temperature + 0.2);
+    llmResult = await deps.llm(llmReq);
+  }
+
   const { status, gates } = await finalizeItemFromLlm(deps, item, template, llmResult, {
     mode: req.mode,
     usageChannel: 'sync',
@@ -575,6 +650,9 @@ export interface BatchDeps extends GenerateDeps {
   }): Promise<void>;
   /** Leave item pending but record why a batch custom failed. */
   noteBatchFailure(item: ItemRow, error: string): Promise<void>;
+  /** Leave item pending, bump its gen_retry counter, so the next submit re-issues
+   *  it with a larger max_tokens (P1 batch-aware retry). */
+  noteBatchRetry(item: ItemRow, detail: string): Promise<void>;
 }
 
 /** Opaque Anthropic messages.create params — typed in index.ts where the SDK lives. */
@@ -599,6 +677,7 @@ export interface AnthropicBatchApi {
       message?: {
         content: Array<{ type: string; name?: string; input?: unknown }>;
         usage: { input_tokens: number; output_tokens: number };
+        stop_reason?: string | null;
       };
       error?: { message?: string };
     };
@@ -609,6 +688,7 @@ export interface AnthropicBatchApi {
 export function llmResultFromBatchMessage(message: {
   content: Array<{ type: string; name?: string; input?: unknown }>;
   usage: { input_tokens: number; output_tokens: number };
+  stop_reason?: string | null;
 }): LlmResult | null {
   const toolUse = message.content.find(
     (b) => b.type === 'tool_use' && b.name === 'emit_content',
@@ -618,6 +698,7 @@ export function llmResultFromBatchMessage(message: {
     output: toolUse.input,
     tokensIn: message.usage.input_tokens,
     tokensOut: message.usage.output_tokens,
+    stopReason: message.stop_reason ?? undefined,
   };
 }
 
@@ -661,7 +742,13 @@ export async function submitBatchJob(
     const expectedHash = await dataHash(item.input_data);
     if (expectedHash !== item.data_hash) continue;
 
-    const llmReq = buildItemLlmRequest(item, template);
+    // P1: an item re-queued after a truncated/degenerate batch result gets a
+    // bumped budget so the retry doesn't hit the same wall.
+    const retry = Number((item.validation as { gen_retry?: unknown } | null)?.gen_retry ?? 0);
+    const override = retry > 0
+      ? Math.min(MAX_OUTPUT_TOKENS_CAP, Math.round(sizedMaxTokens(template) * (1 + 0.7 * retry)))
+      : undefined;
+    const llmReq = buildItemLlmRequest(item, template, override ? { maxTokensOverride: override } : undefined);
     requests.push({ custom_id: item.id, params: toMessageParams(llmReq) });
   }
 
@@ -745,6 +832,17 @@ export async function collectBatchJob(
       if (!template) {
         failures++;
         await deps.noteBatchFailure(item, `template ${item.template_key} v${item.template_version} not found`);
+        continue;
+      }
+      // P1 (batch): a truncated/degenerate succeeded result is NOT finalized —
+      // bill the wasted attempt, leave the item pending with a bumped gen_retry,
+      // and let the next drain re-submit it with a larger budget. Capped at 1
+      // retry; after that it finalizes and the gates fail it terminally.
+      const retry = Number((item.validation as { gen_retry?: unknown } | null)?.gen_retry ?? 0);
+      if ((llmResult.stopReason === 'max_tokens' || isDegenerate(llmResult.output)) && retry < 1) {
+        await deps.addJobUsage(item.job_id, llmResult.tokensIn, llmResult.tokensOut, 'batch');
+        await deps.noteBatchRetry(item,
+          `${llmResult.stopReason === 'max_tokens' ? 'truncated' : 'degenerate'} — requeued (retry ${retry + 1})`);
         continue;
       }
       await finalizeItemFromLlm(deps, item, template, llmResult, { mode, usageChannel: 'batch' });

@@ -9,11 +9,14 @@ import {
   buildItemLlmRequest,
   coerceToSchema,
   constraintNotes,
+  estimateOutputTokens,
   fillTemplate,
   finalizeItemFromLlm,
   gateFaqShape,
   generateItem,
+  isDegenerate,
   llmResultFromBatchMessage,
+  sizedMaxTokens,
   resolveGuards,
   reviewSampleHit,
   stripForStrict,
@@ -308,7 +311,30 @@ Deno.test('buildItemLlmRequest: returns model, system, userPrompt, toolSchema', 
   assert(req.system.length > 0);
   assertMatch(req.userPrompt, /RÀNG BUỘC/);
   assertEquals(typeof req.toolSchema, 'object');
-  assertEquals(req.maxTokens, template.max_tokens);
+  // P3: max_tokens is auto-sized to the schema's length floor, never below the
+  // template's own value, and an explicit override wins.
+  assert(req.maxTokens >= template.max_tokens);
+  const override = buildItemLlmRequest(
+    { item_key: 'so-chu-dao-7-su-menh-3', input_data: inputData }, template, { maxTokensOverride: 9999 },
+  );
+  assertEquals(override.maxTokens, 9999);
+});
+
+Deno.test('P3: sizedMaxTokens floors on schema length bounds, never below template', async () => {
+  const { template } = await makeFakeWorld();
+  assert(estimateOutputTokens(template) > 0);
+  assert(sizedMaxTokens(template) >= template.max_tokens);
+});
+
+Deno.test('P1: isDegenerate catches stub shells, unresolved tokens, duplicate shells; passes real content', () => {
+  assert(isDegenerate({ a: 'placeholder', b: 'placeholder', c: 'placeholder' })); // ≥2 stubs
+  assert(isDegenerate({ a: 'nội dung {lifePath} lỗi', b: 'x', c: 'y', d: 'z' }));  // leaked token
+  assert(isDegenerate({ a: 'trùng', b: 'trùng', c: 'trùng', d: 'trùng' }));        // near-identical shell
+  assert(isDegenerate({}));                                                         // no strings
+  assert(!isDegenerate({
+    a: 'Một đoạn văn hoàn chỉnh và thật', b: 'Một đoạn khác hẳn về nội dung',
+    c: 'Nội dung phong phú thứ ba', d: 'Và một đoạn rất đa dạng nữa',
+  }));
 });
 
 Deno.test('llmResultFromBatchMessage: parses emit_content tool_use + usage', () => {

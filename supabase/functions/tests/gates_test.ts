@@ -1,6 +1,6 @@
 /** Table-driven tests for the generic gate module (per-item + batch scope). */
 
-import { assert, assertEquals } from './_assert.ts';
+import { assert, assertEquals, assertMatch } from './_assert.ts';
 import {
   gateBannedPhrases,
   gateEntityConsistency,
@@ -185,6 +185,26 @@ Deno.test('runBatchGates flags the stamped opening under phrase_frequency (WP3 a
   assertEquals(res.get('b')!.gates.find((g) => g.gate === 'phrase_frequency')!.passed, false);
   assertEquals(res.get('c')!.gates.find((g) => g.gate === 'phrase_frequency')!.passed, false);
   assertEquals(res.get('d')!.gates.find((g) => g.gate === 'phrase_frequency')!.passed, true);
+});
+
+Deno.test('phrase_frequency scans every length-bounded field, not just intro (career stamp)', () => {
+  // Intros all differ; careers all open "Trong công việc, bạn …" — the exact
+  // shape the old intro-only gate missed (5/5 careers stamped in the golden run).
+  const items = [
+    { id: 'a', output: { intro: 'Mở đầu độc đáo alpha khác biệt hoàn toàn.', career: 'Trong công việc, bạn nổi bật rõ rệt.' } },
+    { id: 'b', output: { intro: 'Một khởi đầu beta rất riêng biệt nữa.', career: 'Trong công việc, bạn luôn tỏa sáng.' } },
+    { id: 'c', output: { intro: 'Cách vào bài gamma hoàn toàn mới lạ.', career: 'Trong công việc, bạn thường dẫn đầu.' } },
+  ];
+  const guards = {
+    length: { fields: { intro: [10, 200], career: [10, 200] } },
+    phrase_frequency: { severity: 'flag', max_shared: 2 },
+  };
+  const res = runBatchGates(items, guards);
+  for (const id of ['a', 'b', 'c']) {
+    const g = res.get(id)!.gates.find((x) => x.gate === 'phrase_frequency')!;
+    assertEquals(g.passed, false);
+    assertMatch(String(g.detail), /career/);
+  }
 });
 
 Deno.test('runBatchGates: single-item batch has no similarity signal, empty batch is fine', () => {

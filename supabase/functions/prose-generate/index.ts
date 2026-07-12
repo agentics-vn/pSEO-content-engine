@@ -42,13 +42,18 @@ export function toAnthropicMessageParams(req: LlmRequest): Anthropic.MessageCrea
     model: req.model,
     max_tokens: req.maxTokens,
     ...(modelAcceptsTemperature(req.model) ? { temperature: req.temperature } : {}),
-    system: req.system,
+    // T1 prompt caching: system + tools are byte-identical across every item of
+    // a template, so cache them once and re-read (~90% off the prefix). The
+    // per-item userPrompt below is the uncached suffix. Marking the last of the
+    // ordered prefix blocks (tools, then system) covers both.
+    system: [{ type: 'text', text: req.system, cache_control: { type: 'ephemeral' } }],
     messages: [{ role: 'user', content: req.userPrompt }],
     tools: [{
       name: 'emit_content',
       description: 'Nộp bài viết hoàn chỉnh theo đúng schema.',
       input_schema: req.toolSchema as Anthropic.Tool['input_schema'],
       strict: true,
+      cache_control: { type: 'ephemeral' },
     } as Anthropic.Tool & { strict: true }],
     tool_choice: { type: 'tool', name: 'emit_content' },
   };
@@ -68,6 +73,7 @@ async function callAnthropic(req: LlmRequest): Promise<LlmResult> {
     output: toolUse.input,
     tokensIn: response.usage.input_tokens,
     tokensOut: response.usage.output_tokens,
+    stopReason: response.stop_reason ?? undefined,
   };
 }
 
@@ -100,6 +106,7 @@ const batchApi: AnthropicBatchApi = {
           message?: {
             content: Array<{ type: string; name?: string; input?: unknown }>;
             usage: { input_tokens: number; output_tokens: number };
+            stop_reason?: string | null;
           };
           error?: { message?: string };
         },
@@ -170,6 +177,19 @@ const deps: BatchDeps = {
       ...(item.validation ?? {}),
       batch_error: errorMsg,
     };
+    const { error } = await supabase.from('prose_items')
+      .update({ validation, updated_at: new Date().toISOString() })
+      .eq('id', item.id);
+    if (error) throw error;
+  },
+  async noteBatchRetry(item, detail) {
+    const prev = Number((item.validation as { gen_retry?: unknown } | null)?.gen_retry ?? 0);
+    const validation = {
+      ...(item.validation ?? {}),
+      gen_retry: prev + 1,
+      retry_note: detail,
+    };
+    // Stays pending: the next submit re-issues it with a bumped budget.
     const { error } = await supabase.from('prose_items')
       .update({ validation, updated_at: new Date().toISOString() })
       .eq('id', item.id);

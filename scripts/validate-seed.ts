@@ -43,7 +43,7 @@ try {
 }
 
 // ── templates ────────────────────────────────────────────────────────────────
-const KNOWN_MODELS = ['claude-sonnet-5', 'claude-haiku-4-5', 'claude-opus-4-8', 'claude-sonnet-4-6', 'claude-sonnet-4-5', 'claude-opus-4-5'];
+import { KNOWN_MODELS } from '../supabase/functions/_shared/models.ts';
 const templates: Array<Record<string, any>> = [];
 for await (const f of Deno.readDir(seedDir)) {
   if (!f.isFile || !f.name.startsWith('template.') || !f.name.endsWith('.json')) continue;

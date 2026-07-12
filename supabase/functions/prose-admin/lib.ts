@@ -17,6 +17,7 @@ import { dataHash } from '../_shared/hash.ts';
 import { hasFailingGate, runBatchGates, type GateResult } from '../_shared/gates/index.ts';
 import { corsHeaders, corsPreflight } from '../_shared/cors.ts';
 import { assembleItemGates } from '../prose-generate/lib.ts';
+import { KNOWN_MODELS, isKnownModel } from '../_shared/models.ts';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -321,6 +322,13 @@ export function makeAdminHandler(deps: AdminDeps, opts: { runBudgetMs?: number }
         const t = await body<TemplateInput>();
         if (!t.key || !t.name || !t.system_prompt || !t.user_template || !t.output_schema || !t.model) {
           return reply({ error: 'key, name, system_prompt, user_template, output_schema, model are required' }, 400);
+        }
+        // Hard-block an unknown model at the write point (the Sonnet→Haiku flip is
+        // a new template version through here). A typo would otherwise 404 at
+        // generation — 144 failed rows + wasted spend. Add new ids to
+        // _shared/models.ts when a model ships.
+        if (!isKnownModel(t.model)) {
+          return reply({ error: `model "${t.model}" is not a known model id (${KNOWN_MODELS.join(', ')}); add it to _shared/models.ts if it is real` }, 400);
         }
         const latest = await deps.getLatestTemplateVersion(site.site_id, t.key);
         const version = t.version ?? (latest ?? 0) + 1;
