@@ -28,8 +28,10 @@ C. SITE REPO (already integrated — the demo pages became the components)
 ```
 
 **The full Phase A specification — what to produce and exactly what the
-engine accepts — is [`PHASE-A-HANDOFF.md`](./PHASE-A-HANDOFF.md). Give that
-doc verbatim to the Claude Code session in the site repo.**
+engine accepts — is [`PHASE-A-HANDOFF.md`](./PHASE-A-HANDOFF.md). To hand this
+to a Claude Code session in a client site repo, upload the self-contained
+bundle [`site-repo-handoff/`](./site-repo-handoff/) (orientation + the contract
++ the method + a worked example + a copy-paste kickoff prompt).**
 
 The critical trick in phase A: **write the 2–3 demo pages against
 engine-shaped data** (a hand-authored `output` row matching the schema, in a

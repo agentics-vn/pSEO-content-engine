@@ -1,13 +1,9 @@
 # Template authoring — the SEO strategy seat
 
-> **Which doc am I?** This is the *method* — how a strategist decides what goes
-> into a template. It backs the `author-template` skill (the productized Seat-1
-> path, run **in the engine repo** from a `seeds/<client>/brief.json`). The
-> *contract* — exactly what the engine accepts, field by field — is
-> [`PHASE-A-HANDOFF.md`](./PHASE-A-HANDOFF.md), which is the doc you upload to a
-> Claude Code session working **in a client site repo** (the DIY path). Both
-> produce the same `seeds/<client>/` folder; a ready-to-upload bundle of the
-> site-repo path lives in [`site-repo-handoff/`](./site-repo-handoff/).
+> **Bundle snapshot** (site-repo handoff, 2026-07). Canonical source:
+> `docs/TEMPLATE-AUTHORING.md` in the pSEO content-engine repo. This is the
+> **method** (how to decide what goes in the contract); the contract itself is
+> `01-engine-contract.md`. Read `README.md` in this bundle first.
 
 A template is not a config file; it is **SEO strategy compiled into data**.
 Everything the strategist decides — target queries, page shape, hub & spoke
