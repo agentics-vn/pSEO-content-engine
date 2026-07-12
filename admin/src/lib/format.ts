@@ -11,6 +11,32 @@ export function prettyKey(itemKey: string): string {
   return m ? `Chủ đạo ${m[1]} × Sứ mệnh ${m[2]}` : itemKey;
 }
 
+/** Compact combo label for tight lists, e.g. "7×3". */
+export function comboShortKey(itemKey: string): string {
+  const m = /^so-chu-dao-(\d+)-su-menh-(\d+)$/.exec(itemKey);
+  return m ? `${m[1]}×${m[2]}` : itemKey;
+}
+
+/** Life-path digit for the avatar circle in queue UIs. */
+export function comboFace(itemKey: string): string {
+  const m = /^so-chu-dao-(\d+)/.exec(itemKey);
+  return m?.[1] ?? '•';
+}
+
+const SHORT_STATUS: Record<string, string> = {
+  pending: 'Pending',
+  generated: 'Generated',
+  flagged: 'Flagged',
+  failed_validation: 'Failed',
+  approved: 'Approved',
+  rejected: 'Rejected',
+  published: 'Published',
+};
+
+export function shortStatus(status: string): string {
+  return SHORT_STATUS[status] ?? status.replace(/_/g, ' ');
+}
+
 export function gatesOf(it: ReviewItem): GateResult[] {
   return [...(it.validation.gates ?? []), ...(it.validation.batch_gates ?? [])];
 }

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { DataSource, JobRow, ReviewItem } from '../types';
 import { gatesOf, prettyKey } from '../lib/format';
 import { navigate } from '../router';
-import { GateList, ItemTitle, OutputPreview, StatusPill } from '../components/proseBits';
+import { GateList, ItemTitle, OutputPreview, ReviewListItem, StatusPill } from '../components/proseBits';
 
 const STATUSES = ['', 'generated', 'flagged', 'approved', 'rejected', 'failed_validation'] as const;
 
@@ -182,13 +182,15 @@ export function ReviewPage({
       ) : (
         <div className="review-layout">
           <aside className="card review-list">
-            <h2>Items</h2>
+            <div className="review-list-head">
+              <h2>Items</h2>
+              <span className="review-list-count">{filtered.length}</span>
+            </div>
             <ul className="review-items">
               {filtered.map((it, i) => (
                 <li key={it.id}>
                   <button type="button" className={i === idx ? 'on' : ''} onClick={() => selectIdx(i)}>
-                    <b>{prettyKey(it.item_key)}</b>
-                    <StatusPill status={it.status} />
+                    <ReviewListItem item={it} active={i === idx} />
                   </button>
                 </li>
               ))}

@@ -1,9 +1,34 @@
 import type { GateResult } from '../types';
-import { gatesOf, prettyKey } from '../lib/format';
+import { gatesOf, prettyKey, shortStatus } from '../lib/format';
 import type { ReviewItem } from '../types';
 
 export function StatusPill({ status }: { status: string }) {
-  return <span className={`st st-${status}`}>{status.replace('_', ' ')}</span>;
+  return <span className={`st st-${status}`}>{status.replace(/_/g, ' ')}</span>;
+}
+
+export function ReviewListItem({ item, active }: { item: ReviewItem; active: boolean }) {
+  const gates = gatesOf(item);
+  return (
+    <span className={`review-list-item${active ? ' on' : ''}`}>
+      <span
+        className={`rli-status rli-status--${item.status}`}
+        title={shortStatus(item.status)}
+        aria-label={shortStatus(item.status)}
+      />
+      <span className="rli-title" title={prettyKey(item.item_key)}>{prettyKey(item.item_key)}</span>
+      {gates.length > 0 && (
+        <span className="rli-pills" aria-hidden>
+          {gates.map((g, i) => (
+            <i
+              key={i}
+              className={g.passed ? 'on' : g.severity === 'fail' ? 'redfail' : 'flag'}
+              title={`${g.gate}: ${g.passed ? 'passed' : g.detail ?? 'needs review'}`}
+            />
+          ))}
+        </span>
+      )}
+    </span>
+  );
 }
 
 export function GateList({ gates }: { gates: GateResult[] }) {
