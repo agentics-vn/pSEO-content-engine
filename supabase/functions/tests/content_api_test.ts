@@ -24,7 +24,7 @@ async function makeWorld() {
     { site_id: 'site-2', key_hash: await sha256Hex(RAW_KEY_OTHER), template_key: null, scope: 'read', revoked: false },
   ];
   const published: Array<PublishedRow & { site_id: string }> = [
-    { site_id: 'site-1', item_key: 'so-chu-dao-7-su-menh-3', template_key: 'combo-so-chu-dao-su-menh', template_version: 2, output: { intro: 'a' }, updated_at: '2026-07-01T00:00:00Z' },
+    { site_id: 'site-1', item_key: 'so-chu-dao-7-su-menh-3', template_key: 'combo-so-chu-dao-su-menh', template_version: 2, output: { intro: 'a' }, facts: { harmony: 'thử thách', linking: 4, maturity: 1 }, updated_at: '2026-07-01T00:00:00Z' },
     { site_id: 'site-1', item_key: 'so-chu-dao-1-su-menh-5', template_key: 'combo-so-chu-dao-su-menh', template_version: 1, output: { intro: 'b' }, updated_at: '2026-06-01T00:00:00Z' },
     { site_id: 'site-1', item_key: 'trang-khac', template_key: 'other-template', template_version: 1, output: { intro: 'c' }, updated_at: '2026-06-15T00:00:00Z' },
     { site_id: 'site-2', item_key: 'secret-item', template_key: 'combo-so-chu-dao-su-menh', template_version: 1, output: { intro: 'SECRET' }, updated_at: '2026-06-01T00:00:00Z' },
@@ -68,6 +68,9 @@ Deno.test('published returns only published rows for the resolved site + templat
   const rows = await res.json();
   assertEquals(rows.length, 2);
   assert(rows.every((r: PublishedRow) => r.template_key === 'combo-so-chu-dao-su-menh'));
+  // Deterministic facts pass through untouched so the site renders them without recompute.
+  const combo = rows.find((r: PublishedRow) => r.item_key === 'so-chu-dao-7-su-menh-3');
+  assertEquals(combo.facts, { harmony: 'thử thách', linking: 4, maturity: 1 });
 });
 
 Deno.test('WP5 acceptance: a sochumenh key cannot read another site\'s published rows', async () => {

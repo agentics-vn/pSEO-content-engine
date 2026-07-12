@@ -28,14 +28,20 @@ const deps: ContentApiDeps = {
   },
   async listPublished(siteId, filter) {
     let q = supabase.from('prose_published')
-      .select('item_key, template_key, template_version, output, updated_at')
+      .select('item_key, template_key, template_version, output, updated_at, input_data')
       .eq('site_id', siteId);
     if (filter.template) q = q.eq('template_key', filter.template);
     if (filter.sinceVersion !== undefined) q = q.gt('template_version', filter.sinceVersion);
     if (filter.sinceUpdatedAt !== undefined) q = q.gt('updated_at', filter.sinceUpdatedAt);
     const { data, error } = await q.order('item_key');
     if (error) throw error;
-    return (data ?? []) as PublishedRow[];
+    // Expose the item's stored input_data as `facts` — the deterministic values
+    // the prose stands on (harmony/linking/maturity/… from computeComboFacts).
+    // Read-side passthrough: no regeneration, works for every published row.
+    return (data ?? []).map(({ input_data, ...row }) => ({
+      ...row,
+      facts: (input_data ?? undefined) as Record<string, unknown> | undefined,
+    })) as PublishedRow[];
   },
   async upsertMetrics(siteId, source, rows: MetricsRow[]) {
     const { data, error } = await supabase.from('page_metrics')

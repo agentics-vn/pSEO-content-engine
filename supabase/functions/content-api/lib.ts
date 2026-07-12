@@ -19,6 +19,10 @@ export interface PublishedRow {
   template_version: number;
   output: Record<string, unknown>;
   updated_at: string;
+  /** The item's stored input_data — deterministic facts the prose stands on
+   *  (harmony/linking/maturity/…). Engine-computed, never model-emitted; the
+   *  consuming site renders these instead of recomputing. */
+  facts?: Record<string, unknown>;
 }
 
 export interface MetricsRow {
