@@ -72,20 +72,34 @@ setup removes. The pull script catches whole-grid problems (missing combos);
 the page throw catches per-row damage (e.g. a hand-edited generated JSON whose
 slug and facts no longer agree).
 
-## 4. Webhook (optional, after CI endpoint exists)
+## 4. Webhook — the go-live signal (recommended)
 
-Register sochudao's CI trigger once:
+Register a rebuild URL once and every engine publish triggers a fresh build
+automatically — so nobody has to ping "the content is live now". The engine's
+publish handler already fires registered webhooks (5s timeout, failures ignored,
+never blocks a publish).
+
+Easiest rebuild URL: a **deploy hook** from your host — a secret POST URL that
+triggers a build, no auth header needed (Vercel *Deploy Hooks*, Netlify *build
+hooks*, Cloudflare Pages, or a Fly/GitHub `repository_dispatch` proxy). Register
+it once:
 
 ```sh
 curl -X POST "$ENGINE_URL/v1/sites/sochumenh/webhooks" \
   -H "Authorization: Bearer $SOCHUMENH_CONTENT_KEY" \
   -H "content-type: application/json" \
-  -d '{"url":"https://ci.example/hooks/sochumenh-content-updated"}'
+  -d '{"url":"https://api.vercel.com/v1/integrations/deploy/prj_…/…"}'  # your deploy hook
 ```
 
-On publish the engine POSTs `{site, template, item_count}`; the hook should
-re-run `npm run build` (which re-pulls). Until then, scheduled/manual rebuilds
-are fine.
+On each publish the engine POSTs `{site, template, item_count}` to that URL; your
+build re-runs `pull-combos.mjs` (which re-pulls). Publishes fire per item, so a
+5-item golden batch sends 5 triggers — deploy platforms coalesce concurrent
+builds, so this is fine.
+
+**First go-live is still one deliberate flip** (enable the `prebuild` pull +
+set `combo-grid.config.json` to the published item_keys); the webhook automates
+every publish *after* that. Until a rebuild URL exists, scheduled/manual
+rebuilds work.
 
 ## Acceptance (run in the sochudao repo)
 
