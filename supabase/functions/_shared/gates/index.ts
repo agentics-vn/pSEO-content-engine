@@ -36,17 +36,56 @@ export function gateUnicode(ctx: GateContext): GateResult {
            detail: bad.length ? `not ${form}: ${bad.join(', ')}` : undefined };
 }
 
+/** Resolve a length-guard field key against the output. Supports plain string
+ *  fields ("intro") AND dotted paths into arrays/objects ("phanTich.0" → the
+ *  first element of the phanTich array) so array-of-paragraphs fields can be
+ *  length-bounded per element. */
+function resolveLengthTarget(output: Record<string, unknown>, field: string): unknown {
+  let cur: unknown = output;
+  for (const seg of field.split('.')) {
+    if (cur === null || typeof cur !== 'object') return undefined;
+    cur = Array.isArray(cur) ? (cur as unknown[])[Number(seg)] : (cur as Record<string, unknown>)[seg];
+  }
+  return cur;
+}
+
 export function gateLength(ctx: GateContext): GateResult {
   const fields = ctx.guards.length?.fields ?? {};
   const viol: string[] = [];
   for (const [field, bounds] of Object.entries<[number, number]>(fields)) {
-    const val = ctx.output[field];
+    const val = resolveLengthTarget(ctx.output, field);
     if (typeof val !== 'string') { viol.push(`${field}: missing`); continue; }
     const len = [...val].length; // code points, correct for Vietnamese
     if (len < bounds[0] || len > bounds[1]) viol.push(`${field}: ${len}∉[${bounds}]`);
   }
   return { gate: 'length', severity: 'fail', passed: viol.length === 0,
            detail: viol.join('; ') || undefined };
+}
+
+/**
+ * entity_consistency: block a model from INVENTING domain entities. The template
+ * declares a `pattern` (regex matching the entity form, e.g. a Can+Chi pair) and
+ * `allowed` — the entity strings legitimately in play, resolved from input_data
+ * (like required_mentions). Any entity the pattern finds in the prose that isn't
+ * present in the allowed set is flagged as fabricated. Fully generic: the domain
+ * lives entirely in the template's regex + allowed list, never here.
+ *
+ * A config with only a `note` (reviewer guidance, no `pattern`) is a documented
+ * no-op — it passes, preserving the older "reviewer note" behaviour.
+ */
+export function gateEntityConsistency(ctx: GateContext): GateResult {
+  const cfg = ctx.guards.entity_consistency ?? {};
+  if (!cfg.pattern) return { gate: 'entity_consistency', severity: 'flag', passed: true };
+  let re: RegExp;
+  try { re = new RegExp(String(cfg.pattern), 'gu'); }
+  catch { return { gate: 'entity_consistency', severity: 'fail', passed: false, detail: 'invalid pattern' }; }
+  const norm = (s: string) => s.normalize('NFC').replace(/\s+/g, ' ').trim();
+  const allowed = norm((Array.isArray(cfg.allowed) ? cfg.allowed : []).map(String).join('  '));
+  const found = new Set<string>();
+  for (const m of proseOf(ctx.output).matchAll(re)) found.add(norm(m[0]));
+  const invented = [...found].filter((e) => e.length > 0 && !allowed.includes(e));
+  return { gate: 'entity_consistency', severity: 'fail', passed: invented.length === 0,
+           detail: invented.length ? `entities not backed by input_data: ${invented.join(', ')}` : undefined };
 }
 
 export function gateRequiredMentions(ctx: GateContext): GateResult {
@@ -231,7 +270,7 @@ export function runBatchGates(
   return out;
 }
 
-const PER_ITEM = [gateUnicode, gateLength, gateRequiredMentions, gateBannedPhrases, gateNumericConsistency];
+const PER_ITEM = [gateUnicode, gateLength, gateRequiredMentions, gateBannedPhrases, gateNumericConsistency, gateEntityConsistency];
 
 /** Run all configured per-item gates. Schema/faq_shape are checked upstream by
  *  strict tool use + a shape assert; those results should be merged in.

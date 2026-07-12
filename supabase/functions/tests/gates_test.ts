@@ -3,6 +3,7 @@
 import { assert, assertEquals } from './_assert.ts';
 import {
   gateBannedPhrases,
+  gateEntityConsistency,
   gateLength,
   gateNumericConsistency,
   gateRequiredMentions,
@@ -36,6 +37,33 @@ Deno.test('gateLength counts code points and trips out-of-bounds fields', () => 
   assert(gateLength(baseCtx({ output: { intro: 'đúng bảy à' }, guards })).passed); // 10 code points
   assertEquals(gateLength(baseCtx({ output: { intro: 'ngắn' }, guards })).passed, false);
   assertEquals(gateLength(baseCtx({ output: {}, guards })).passed, false); // missing = violation
+});
+
+Deno.test('gateLength bounds array elements via field.N (ngaylanhthangtot)', () => {
+  const guards = { length: { fields: { 'phanTich.0': [3, 10], 'phanTich.1': [3, 10] } } };
+  assert(gateLength(baseCtx({ output: { phanTich: ['bốn từ', 'sáu ký tự'] }, guards })).passed); // 6 & 9 ∈ [3,10]
+  // second element too long → trips
+  assertEquals(gateLength(baseCtx({ output: { phanTich: ['ok đây', 'quá dài đây rồi'] }, guards })).passed, false);
+  // not an array (or missing index) → missing violation, not a crash
+  assertEquals(gateLength(baseCtx({ output: { phanTich: 'chuỗi' }, guards })).passed, false);
+});
+
+Deno.test('gateEntityConsistency flags invented entities, passes backed ones', () => {
+  const canChi = String.raw`(Giáp|Ất|Bính|Đinh|Mậu|Kỷ|Canh|Tân|Nhâm|Quý)\s+(Tý|Sửu|Dần|Mão|Thìn|Tỵ|Ngọ|Mùi|Thân|Dậu|Tuất|Hợi)`;
+  const guards = { entity_consistency: { pattern: canChi, allowed: ['Giáp Tý', 'tuổi Bính Dần xung'] } };
+  // only entities present in allowed → passes
+  assert(gateEntityConsistency(baseCtx({ output: { a: 'Ngày Giáp Tý, xung với tuổi Bính Dần.' }, guards })).passed);
+  // model invents "Kỷ Dậu" (not in input_data) → fails
+  const bad = gateEntityConsistency(baseCtx({ output: { a: 'Ngày Giáp Tý hợp với Kỷ Dậu.' }, guards }));
+  assertEquals(bad.passed, false);
+  assert(bad.detail?.includes('Kỷ Dậu'));
+  // note-only config (no pattern) is a documented no-op → passes
+  assert(gateEntityConsistency(baseCtx({ output: { a: 'bất kỳ' }, guards: { entity_consistency: { note: 'reviewer: check can-chi' } } })).passed);
+  // gate is opt-in: absent from guards → runItemGates omits it
+  assertEquals(
+    runItemGates(baseCtx({ output: { a: 'x' }, guards: {} })).some((g) => g.gate === 'entity_consistency'),
+    false,
+  );
 });
 
 Deno.test('gateRequiredMentions trips when a resolved token is absent', () => {

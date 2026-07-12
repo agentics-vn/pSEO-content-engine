@@ -64,9 +64,28 @@ for await (const f of Deno.readDir(seedDir)) {
     if (typeof t.user_template === 'string' && !t.user_template.includes('{constraint_notes}')) {
       warn(`${where}: user_template has no {constraint_notes} — notes will be appended at the end instead`);
     }
-    // Guards must reference real schema fields.
+    // Guards must reference real schema fields. A length key may be
+    // "field.N" to bound element N of an array-of-strings field.
     for (const field of Object.keys(t.guards?.length?.fields ?? {})) {
-      if (!props[field]) err(`${where}: guards.length.fields.${field} is not in output_schema`);
+      const el = /^(.+)\.(\d+)$/.exec(field);
+      if (el) {
+        const base = props[el[1]];
+        if (!base) err(`${where}: guards.length.fields.${field} — "${el[1]}" is not in output_schema`);
+        else if (base.type !== 'array') err(`${where}: guards.length.fields.${field} — "${el[1]}" is not an array field (index bound only valid on arrays)`);
+        else if (base.maxItems !== undefined && Number(el[2]) >= base.maxItems) err(`${where}: guards.length.fields.${field} — index ${el[2]} is beyond maxItems ${base.maxItems}`);
+      } else if (!props[field]) {
+        err(`${where}: guards.length.fields.${field} is not in output_schema`);
+      }
+    }
+    // entity_consistency: if it auto-checks (has a pattern), the regex must
+    // compile and the allowed[] entity list must be non-empty.
+    const ent = t.guards?.entity_consistency;
+    if (ent?.pattern !== undefined) {
+      try { new RegExp(String(ent.pattern), 'gu'); }
+      catch (e) { err(`${where}: entity_consistency.pattern is not a valid regex: ${e instanceof Error ? e.message : e}`); }
+      if (!Array.isArray(ent.allowed) || ent.allowed.length === 0) {
+        err(`${where}: entity_consistency has a pattern but no allowed[] — the check would flag every entity`);
+      }
     }
     for (const rule of t.guards?.required_mentions?.rules ?? []) {
       if (!props[rule.field]) err(`${where}: guards.required_mentions field "${rule.field}" is not in output_schema`);
