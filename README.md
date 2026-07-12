@@ -68,12 +68,12 @@ membership) — it shows only live engine data. Dashboard: generation bubbles,
 job-runs calendar, gate-pass-rate gauge (goal 90%, WP6 acceptance), 144-combo
 grid coverage, and the review queue with per-gate pill strips —
 approve/publish/reject inline (approve surfaces the 409 when a fail-severity
-gate is red). On login, paste the engine Supabase URL, anon key, and
-`prose-admin` URL (see `docs/DEPLOY.md` §5). Production host:
+gate is red). Engine URL + anon key are baked at build time (`admin/.env.example`
+/ Fly `[build.args]`); login is site slug + email + password. Production:
 `https://pseo-content-engine.fly.dev`.
 
 ```sh
-cd admin && npm install && npm run dev     # or npm run build → dist/
+cd admin && cp .env.example .env && npm install && npm run dev
 fly deploy ./admin                         # from repo root → Fly.io
 ```
 

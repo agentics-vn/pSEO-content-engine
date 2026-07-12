@@ -2,26 +2,56 @@
  * RemoteSource — the single data source: speaks to prose-admin with a Supabase
  * user JWT. There is no mock/demo source; the admin UI always shows live
  * engine data.
+ *
+ * Engine endpoint (URL / anon key / prose-admin) is baked at build time via
+ * VITE_* — one engine DB serves every tenant site. Login only collects
+ * credentials + which site to operate on.
  */
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { DashboardData, DataSource, MetricsSummary } from './types';
 
-export interface RemoteConfig {
+export interface EngineConfig {
   supabaseUrl: string;
   supabaseAnonKey: string;
-  adminApiUrl: string; // e.g. https://<ref>.supabase.co/functions/v1/prose-admin
+  adminApiUrl: string;
+}
+
+export interface LoginCredentials {
   siteSlug: string;
   email: string;
   password: string;
 }
 
+export type RemoteConfig = EngineConfig & LoginCredentials;
+
 const CONFIG_KEY = 'pseo-admin-config';
 
-export function savedConfig(): Omit<RemoteConfig, 'password'> | null {
+/** Baked-in engine project. Required at build time for production. */
+export function engineConfig(): EngineConfig {
+  const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL ?? '').replace(/\/$/, '');
+  const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY ?? '';
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error(
+      'VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY must be set at build time (see admin/.env.example)',
+    );
+  }
+  const adminApiUrl =
+    (import.meta.env.VITE_ADMIN_API_URL ?? '').replace(/\/$/, '') ||
+    `${supabaseUrl}/functions/v1/prose-admin`;
+  return { supabaseUrl, supabaseAnonKey, adminApiUrl };
+}
+
+export function savedCredentials(): Omit<LoginCredentials, 'password'> | null {
   try {
     const raw = localStorage.getItem(CONFIG_KEY);
-    return raw ? JSON.parse(raw) : null;
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<LoginCredentials>;
+    if (!parsed.email && !parsed.siteSlug) return null;
+    return {
+      email: parsed.email ?? '',
+      siteSlug: parsed.siteSlug ?? 'sochumenh',
+    };
   } catch {
     return null;
   }
@@ -42,8 +72,10 @@ export class RemoteSource implements DataSource {
     });
     if (error || !data.session) throw new Error(error?.message ?? 'sign-in failed');
     this.token = data.session.access_token;
-    const { password: _p, ...rest } = this.cfg;
-    localStorage.setItem(CONFIG_KEY, JSON.stringify(rest));
+    localStorage.setItem(
+      CONFIG_KEY,
+      JSON.stringify({ email: this.cfg.email, siteSlug: this.cfg.siteSlug }),
+    );
   }
 
   private async call(method: string, path: string, body?: unknown): Promise<any> {

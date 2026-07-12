@@ -55,8 +55,15 @@ from the repo root — no manual bundling needed. Verified locally:
 `deno check` passes on all three, 67 tests green.
 
 ```sh
-supabase functions deploy prose-generate     # verify_jwt stays ON (default)
-supabase functions deploy prose-admin         # verify_jwt stays ON (default)
+# --import-map required when Docker isn't running (CLI falls back to --use-api
+# server-side bundling, which won't see supabase/functions/deno.json otherwise).
+npx supabase functions deploy prose-generate \
+  --project-ref mafqvoahltslxwttmvkn \
+  --import-map supabase/functions/deno.json   # verify_jwt ON (default)
+
+npx supabase functions deploy prose-admin \
+  --project-ref mafqvoahltslxwttmvkn \
+  --import-map supabase/functions/deno.json   # verify_jwt ON (default)
 ```
 
 - `prose-generate` — called only by the steward / prose-admin with the
@@ -136,15 +143,13 @@ an existing template version, and mints a fresh key each time.
 
 ```sh
 cd admin
+cp .env.example .env   # bakes engine URL + anon key (already filled for mafqvoahltslxwttmvkn)
 npm install && npm run dev
 ```
 
-Open the login form and fill in:
-- **Supabase URL** — `https://mafqvoahltslxwttmvkn.supabase.co`
-- **Supabase anon key** — Dashboard → Project Settings → API
-- **prose-admin URL** — `https://mafqvoahltslxwttmvkn.supabase.co/functions/v1/prose-admin`
-- **Site slug** — `sochumenh`
-- Email / password from step 3
+Login asks only for **site slug**, **email**, and **password**. The engine
+Supabase URL / anon key / `prose-admin` URL are fixed at build time — one DB
+for every tenant.
 
 ### Fly.io (production Admin UI)
 
@@ -152,13 +157,12 @@ App: `pseo-content-engine` → `https://pseo-content-engine.fly.dev`
 Org: `agentics-vn` · region: `sin` · static SPA via Caddy.
 
 ```sh
-# From repo root (build context = admin/)
+# From repo root (build context = admin/; VITE_* come from admin/fly.toml [build.args])
 fly deploy ./admin
 ```
 
-Config files live under `admin/` (`Dockerfile`, `Caddyfile`, `fly.toml`). No
-build-time secrets — operators paste Supabase URL / anon key / prose-admin URL
-on the login screen (stored in localStorage, password never persisted).
+Config files live under `admin/` (`Dockerfile`, `Caddyfile`, `fly.toml`).
+Operators never paste engine credentials — only site + login.
 
 Log in with the admin user from step 3, then walk the loop:
 

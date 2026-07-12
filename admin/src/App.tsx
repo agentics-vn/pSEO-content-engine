@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { DashboardData, DataSource, MetricsSummary, ReviewItem, JobRow } from './types';
-import { RemoteSource, savedConfig } from './api';
+import { engineConfig, RemoteSource, savedCredentials } from './api';
 import {
   IconArchive, IconBell, IconCalendar, IconChevron, IconDoc, IconDots, IconFlag,
   IconGear, IconHome, IconLogout, IconPencil, IconPlus, IconSearch, IconSpark,
@@ -35,11 +35,8 @@ export default function App() {
 // ── Login ────────────────────────────────────────────────────────────────────
 
 function Login({ onReady }: { onReady: (s: DataSource) => void }) {
-  const saved = savedConfig();
+  const saved = savedCredentials();
   const [f, setF] = useState({
-    supabaseUrl: saved?.supabaseUrl ?? '',
-    supabaseAnonKey: saved?.supabaseAnonKey ?? '',
-    adminApiUrl: saved?.adminApiUrl ?? '',
     siteSlug: saved?.siteSlug ?? 'sochumenh',
     email: saved?.email ?? '',
     password: '',
@@ -54,7 +51,7 @@ function Login({ onReady }: { onReady: (s: DataSource) => void }) {
     setBusy(true);
     setErr('');
     try {
-      const src = new RemoteSource(f);
+      const src = new RemoteSource({ ...engineConfig(), ...f });
       await src.signIn();
       await src.load(); // fail fast if the API/site is wrong
       onReady(src);
@@ -70,13 +67,10 @@ function Login({ onReady }: { onReady: (s: DataSource) => void }) {
       <div className="login">
         <div className="brand"><IconSpark /><span style={{ fontSize: 16, fontWeight: 800 }}>pSEO.engine</span></div>
         <div className="card">
-          <p className="hint">Sign in with your engine admin account (site_admins membership).</p>
-          <div><label>Supabase URL</label><input value={f.supabaseUrl} onChange={set('supabaseUrl')} placeholder="https://xxxx.supabase.co" /></div>
-          <div><label>Supabase anon key</label><input value={f.supabaseAnonKey} onChange={set('supabaseAnonKey')} placeholder="eyJ…" /></div>
-          <div><label>prose-admin URL</label><input value={f.adminApiUrl} onChange={set('adminApiUrl')} placeholder="https://xxxx.supabase.co/functions/v1/prose-admin" /></div>
-          <div><label>Site slug</label><input value={f.siteSlug} onChange={set('siteSlug')} /></div>
-          <div><label>Email</label><input value={f.email} onChange={set('email')} /></div>
-          <div><label>Password</label><input type="password" value={f.password} onChange={set('password')} /></div>
+          <p className="hint">Sign in with your engine admin account (site_admins membership). Engine endpoint is fixed; pick which tenant site to operate.</p>
+          <div><label>Site slug</label><input value={f.siteSlug} onChange={set('siteSlug')} placeholder="sochumenh" /></div>
+          <div><label>Email</label><input value={f.email} onChange={set('email')} autoComplete="username" /></div>
+          <div><label>Password</label><input type="password" value={f.password} onChange={set('password')} autoComplete="current-password" /></div>
           {err && <p className="hint" style={{ color: 'var(--coral)' }}>{err}</p>}
           <button className="btn-dark" disabled={busy} onClick={signIn}>{busy ? 'Signing in…' : 'Sign in'}</button>
         </div>

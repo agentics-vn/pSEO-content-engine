@@ -10,6 +10,10 @@ primary_region = 'sin'
 
 [build]
 
+[build.args]
+  VITE_SUPABASE_URL = "https://mafqvoahltslxwttmvkn.supabase.co"
+  VITE_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1hZnF2b2FobHRzbHh3dHRtdmtuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM3NzQ4NzEsImV4cCI6MjA5OTM1MDg3MX0.3yNSLCLv6BUwDiApQFrO4hchKwYyXigX0FUTBVGmmRM"
+
 [http_service]
   internal_port = 8080
   force_https = true
