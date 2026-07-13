@@ -94,12 +94,24 @@ Derive, don't improvise:
   compute,
 - `similarity.max_pairwise` stays ≤ 0.55 unless measured otherwise.
 
-## 5. Voice + prompts
+## 5. Voice + prompts — three layers, never duplicated
 
-`system_prompt` carries the brand voice, the DO-NOTs, and the anti-stamp
-instruction (vary openings). `user_template` carries ONLY facts from
-`input_data` plus `{constraint_notes}`. If a sentence in the prompt isn't a
-fact or a constraint, it's voice — move it to the system prompt.
+1. **`persona.md` (site level)** — the doctrine that holds on EVERY page of
+   the site regardless of template: brand voice, the persuasion arc (name the
+   reader's real problem → position the site as the resolution), ethical
+   guardrails/DO-NOTs. The engine prepends it to every template's
+   `system_prompt` at generation, so all templates inherit one doctrine by
+   construction. Author it once from `brief.voice`.
+2. **`system_prompt` (template level)** — ONLY what is specific to this
+   template: domain fact rules, the anti-stamp instruction (vary openings),
+   "facts only from provided data". If a rule should hold on every template of
+   the site, it belongs in `persona.md`, not here.
+3. **`user_template`** — ONLY facts from `input_data` plus
+   `{constraint_notes}`. No voice.
+
+A material persona change later ⇒ template version bump + few-shot refresh
+(few-shots dominate style; stale ones exemplifying the old doctrine will
+defeat a new persona).
 
 ## 6. Golden set → distill → phase (per WP6, every template)
 

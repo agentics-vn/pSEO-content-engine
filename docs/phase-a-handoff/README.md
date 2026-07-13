@@ -120,6 +120,8 @@ build-time drift throw guards it.
 seeds/<client>/
   # engine INGESTS these:
   site.json              # {slug, name, domain}
+  persona.md             # OPTIONAL site-level doctrine — prepended to EVERY template's
+                         # system_prompt at generation (voice, persuasion arc, guardrails)
   template.<key>.json    # output_schema + guards + prompts + model  (the core)
   worklist.golden.json   # the golden-set job body (8–15 items spanning the axis)
   # strategy COMPANIONS (for human review; engine never reads them):
