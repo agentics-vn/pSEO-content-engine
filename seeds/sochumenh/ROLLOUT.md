@@ -34,6 +34,7 @@ Suggested phases (tune to the real distribution once `keywords.csv` exists):
 | Phase | Scope | Sampling |
 |---|---|---|
 | Golden | ✅ done — 5 items, 2 life-paths | 100% |
+| **Persona + v3** | adopt `persona.draft.md` → `persona.md` + template v3 (slimmed prompt, bridge/cta arc — see `v3.PROPOSAL.*.json` header for the recipe); re-golden at 100% | 100% |
 | P1 | top demand tier by volume | 25% |
 | P2 | mid tier | 10–25% |
 | Tail | remaining combos | 5–10% |

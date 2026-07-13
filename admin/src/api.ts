@@ -159,6 +159,13 @@ export class RemoteSource implements DataSource {
     return res.ok && (res.items as unknown[])?.length ? (res as unknown as MetricsSummary) : null;
   };
 
+  getSiteInfo = async (): Promise<{ slug: string; name: string; persona: string | null; persona_updated_at: string | null } | null> => {
+    const res = await this.call('GET', '/site');
+    return res.ok
+      ? res as unknown as { slug: string; name: string; persona: string | null; persona_updated_at: string | null }
+      : null;
+  };
+
   listTemplates = async (): Promise<TemplateRow[]> => {
     const res = await this.call('GET', '/templates');
     return res.ok ? (res.templates as TemplateRow[]) ?? [] : [];

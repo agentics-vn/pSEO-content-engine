@@ -142,9 +142,10 @@ export interface AdminDeps {
   }>>;
   getTemplateFull(siteId: string, key: string, version: number): Promise<Record<string, unknown> | null>;
   insertTemplate(siteId: string, userId: string, row: TemplateInput & { version: number }): Promise<{ id: string; version: number }>;
-  /** Site persona (sites.persona) — fetched here so the dry-run proxy can carry
-   *  it (the dry-run envelope has no site_id and prose-generate stays DB-free). */
-  getSitePersona(siteId: string): Promise<string | null>;
+  /** Site row incl. persona — used by GET /site (operator visibility) and by
+   *  the dry-run proxy (the dry-run envelope has no site_id and prose-generate
+   *  stays DB-free, so prose-admin carries the persona). */
+  getSite(siteId: string): Promise<{ name: string; persona: string | null; persona_updated_at: string | null } | null>;
   invokeDryRun(siteId: string, template: Record<string, unknown>, inputData: Record<string, unknown>, itemKey?: string, persona?: string | null): Promise<{
     ok: boolean; output?: Record<string, unknown>; gates?: GateResult[];
     tokens_in?: number; tokens_out?: number; error?: string;
@@ -293,6 +294,21 @@ export function makeAdminHandler(deps: AdminDeps, opts: { runBudgetMs?: number }
         return reply({ error: `role "${site.role}" cannot modify the pipeline` }, 403);
       }
 
+      // ── GET /site — site info incl. persona (operator visibility; the
+      //    persona silently shapes every page, so it must not be invisible
+      //    config). Read-only: editing stays with the site's seed
+      //    (persona.md + load-seed), preserving site ownership. ─────────────
+      if (req.method === 'GET' && path === '/site') {
+        const info = await deps.getSite(site.site_id);
+        return reply({
+          ok: true,
+          slug: site.slug,
+          name: info?.name ?? site.slug,
+          persona: info?.persona ?? null,
+          persona_updated_at: info?.persona_updated_at ?? null,
+        });
+      }
+
       // ── GET /templates — list site templates ─────────────────────────────
       if (req.method === 'GET' && path === '/templates') {
         const templates = await deps.listTemplates(site.site_id);
@@ -325,7 +341,7 @@ export function makeAdminHandler(deps: AdminDeps, opts: { runBudgetMs?: number }
         const tpl = await deps.getTemplateFull(site.site_id, t.key, version);
         if (!tpl) return reply({ error: `no template "${t.key}" v${version}` }, 404);
         // Thread the site persona so Template Studio tests match real generation.
-        const persona = await deps.getSitePersona(site.site_id);
+        const persona = (await deps.getSite(site.site_id))?.persona ?? null;
         const result = await deps.invokeDryRun(site.site_id, tpl, t.input_data, t.item_key, persona);
         return reply(result, result.ok ? 200 : 422);
       }

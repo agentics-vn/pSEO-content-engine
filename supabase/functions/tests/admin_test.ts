@@ -72,7 +72,7 @@ function makeWorld(role: string = 'reviewer', opts?: { persona?: string | null }
       const t = [...templates.values()].find((x) => x.site_id === siteId && x.key === key && x.version === version);
       return Promise.resolve(t ? { ...t } : null);
     },
-    getSitePersona: () => Promise.resolve(sitePersona),
+    getSite: () => Promise.resolve({ name: 'Số Chủ Mệnh', persona: sitePersona, persona_updated_at: sitePersona ? '2026-07-13T00:00:00Z' : null }),
     invokeDryRun: (_siteId, _tpl, _input, _itemKey, persona) => {
       dryRunCalls.push({ persona: persona ?? null });
       return Promise.resolve({
@@ -771,4 +771,18 @@ Deno.test('POST /templates/test threads the site persona into the dry-run (and n
   const without = makeWorld('editor');
   await call(without.deps, 'POST', '/templates/test', { key: 'combo-so-chu-dao-su-menh', input_data: { x: 1 } });
   assertEquals(without.dryRunCalls[0].persona, null);
+});
+
+Deno.test('GET /site returns persona info read-only (operator visibility)', async () => {
+  const w = makeWorld('editor', { persona: 'DOCTRINE hiển thị.' });
+  const res = await call(w.deps, 'GET', '/site');
+  assertEquals(res.status, 200);
+  const body = await res.json();
+  assertEquals(body.slug, 'sochumenh');
+  assertEquals(body.persona, 'DOCTRINE hiển thị.');
+  assertEquals(typeof body.persona_updated_at, 'string');
+
+  const bare = makeWorld('editor');
+  const none = await (await call(bare.deps, 'GET', '/site')).json();
+  assertEquals(none.persona, null);
 });
