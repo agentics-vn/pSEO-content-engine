@@ -213,6 +213,11 @@ export function ReviewPage({
                 <b className="detail-title">{prettyKey(current.item_key)}</b>
                 <span className="meta">{current.template_key} v{current.template_version}
                   {current.regen_count ? ` · regen ${current.regen_count}/3` : ''}
+                  {(current.validation as { gen_retry?: number; retry_note?: string }).gen_retry
+                    ? <span title={(current.validation as { retry_note?: string }).retry_note ?? 'auto-retried after a truncated/degenerate first attempt'}>
+                        {` · auto-retry ×${(current.validation as { gen_retry?: number }).gen_retry}`}
+                      </span>
+                    : ''}
                   {' · '}
                   <span className="cost" title={`${current.tokens_in ?? 0} in / ${current.tokens_out ?? 0} out`}>
                     {fmtUsd(itemActualCostUsd(current, model))}

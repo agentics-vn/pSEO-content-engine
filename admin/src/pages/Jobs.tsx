@@ -147,6 +147,8 @@ export function JobsPage({
                 <p className="hint">
                   {comboCount} combos
                   {estimate ? ` · Batch estimate ~$${estimate.estUsd} (50% of sync)` : ''}
+                  {' · ~'}{Math.round(comboCount * samplePct / 100)} to review
+                  {selectedTpl ? ` · using ${selectedTpl.key} v${selectedTpl.version} · ${selectedTpl.model}` : ''}
                 </p>
               </div>
             ) : (

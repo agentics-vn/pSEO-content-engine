@@ -155,7 +155,12 @@ The literal `POST /jobs` body:
   `(site, template_key, version, item_key, data_hash)`: re-posting identical
   rows is free (deduped); changed facts regenerate exactly the changed pages.
 - Include **hub and sibling slugs inside input_data** (`hub`, `siblings`) —
-  internal linking is data the prose/pages consume, not an afterthought.
+  internal linking is data the prose/pages consume, not an afterthought. For the
+  built-in **combo axis the engine now injects these automatically** (`hub` =
+  `so-chu-dao-<lifePath>` pillar slug; `siblings` = same-life-path combos): the
+  site renders links from `row.facts.hub`/`row.facts.siblings` and must not
+  re-derive them (see the integration kit's `ContentPage.astro`). Ensure the hub
+  pillar page exists. Other verticals still pass their own `hub`/`siblings`.
 - Golden set: 8–15 items spanning the axis's variety (regions, classes,
   edge values like master numbers or falling markets) so review sees the
   voice under every condition.
