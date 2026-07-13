@@ -130,9 +130,12 @@ Template (immutable per version)
                       externally via the content-api)
 ```
 
-- **One item generated per API call**, driven by the admin UI in a loop
-  until no items are pending — keeps each edge function invocation well
-  under any serverless wall-clock cap, regardless of batch size.
+- **Jobs run through Anthropic Message Batches by default** (submit → poll →
+  collect; ~50% token cost), with a per-item sync channel as the escape hatch
+  (regen, dry-run). Truncated/degenerate results auto-retry once with a bumped
+  budget; output budgets are auto-sized from the template's own length bounds;
+  the static prompt prefix is cache_control-cached. Every invocation stays
+  under the serverless wall-clock cap regardless of batch size.
 - **Publishing is one-way.** A published item is never mutated in place; a
   content refresh creates a new template version and republishes, and
   `prose_published` always serves the newest published row per item key.
@@ -157,6 +160,13 @@ schema. To enable strict mode, these keys must be stripped from the schema
 sent to the API — which means **the model no longer sees those
 constraints** and output quality/shape will drift (fewer/more items than
 required, wrong length) even though the *type* validates.
+
+**Prompt layering (site → template → item):** a per-site `persona`
+(sites.persona — voice, persuasion doctrine, guardrails, authored as
+`seeds/<client>/persona.md`) is prepended to EVERY template's `system_prompt`
+at generation, so all of a site's templates inherit one doctrine with nothing
+copy-pasted. The template's own `system_prompt` carries only template-specific
+rules; `user_template` carries only facts + `{constraint_notes}`.
 
 **Required companion technique:** walk the *original* (un-stripped) schema,
 render every dropped constraint as a plain-language instruction, and append
@@ -206,7 +216,7 @@ column — never hardcoded in the shared module.
 | `schema` | fail (blocks publish) | structural shape mismatch |
 | `required_mentions` | fail | a mandatory entity/field isn't referenced in the prose |
 | `banned_phrases` | fail | forbidden wording |
-| `length` | fail | per-field character bounds |
+| `length` | asymmetric: under-min/missing = fail, over-max = flag | per-field code-point bounds (overflow routes to review, never blocks) |
 | `unicode` | fail | non-normalized text, stray combining marks (critical for diacritic-heavy languages) |
 | `numeric_consistency` | flag | a number in the prose has no basis in the input data |
 | `entity_consistency` | flag | *(generalized from a calendar-specific "canchi_consistency")* — any regex-matched entity in the prose must appear in the input data; regex is per-template config, not hardcoded |
@@ -232,14 +242,17 @@ database and never issues Supabase credentials externally.
 GET  /v1/sites/{site_slug}/published
      ?template={template_key}&since={template_version|updated_at}
      Header: Authorization: Bearer <site-scoped API key>
-     → [{ item_key, template_key, template_version, output, updated_at }, ...]
+     → [{ item_key, template_key, template_version, output, facts, updated_at }, ...]
+       (`facts` = the item's input_data: engine-computed deterministic values
+        the page renders — numbers, hub/sibling link slugs — never recomputed)
 
-POST /v1/sites/{site_slug}/webhooks           (registered via admin UI)
+POST /v1/sites/{site_slug}/webhooks           (registered with the site key)
      Body: { url: "https://api.app-a.example/internal/seo-content-updated" }
-     → engine POSTs a lightweight signal (site, template, item count) here
-       when a job publishes. NOT the payload itself — the app's backend
-       calls GET /published afterward. Keeps the webhook small, idempotent,
-       and decoupled from payload size.
+     → returns a per-site webhook_secret ONCE. On publish the engine POSTs
+       { site, template, template_version, item_key, item_count }, HMAC-SHA256
+       signed over the raw body as `x-signature: sha256=<hex>`. Still a signal,
+       not the payload — the app's backend calls GET /published afterward
+       (the item_key enables `?since=` incremental pulls).
 ```
 
 **Schema evolution policy** (so a content update never silently breaks an

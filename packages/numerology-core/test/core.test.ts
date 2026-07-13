@@ -20,9 +20,9 @@ test('reduceNumber preserves master numbers, including mid-reduction', () => {
   assert.equal(reduceNumber(22), 22);
   assert.equal(reduceNumber(33), 33);
   // 38 → 3+8 = 11: reduction STOPS on a master number (doc comment on
-  // reduceNumber). NOTE: docs/IMPLEMENTATION.md claims reduceNumber(38)=2,
-  // which contradicts the shipped, master-preserving implementation — the
-  // code is the source of truth here.
+  // reduceNumber). An early planning doc claimed reduceNumber(38)=2; the
+  // shipped, master-preserving implementation is the source of truth
+  // (verified equal to @csessh/sochumenh by parity.csessh.test.ts).
   assert.equal(reduceNumber(38), 11);
 });
 

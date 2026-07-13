@@ -1,9 +1,9 @@
-# WP7 — wiring the sochudao consumer (reference)
+# Wiring the sochudao consumer (reference)
 
 The sochudao repo is a separate codebase; this directory holds the ready-to-copy
-pieces and the integration checklist (docs/IMPLEMENTATION.md WP7, architecture
-§9–§10). The engine's contract with sochudao is exactly one API + one webhook +
-one API key — nothing here touches the engine's DB.
+pieces and the integration checklist (architecture §9–§10; the generic method is
+`docs/phase-a-handoff/`). The engine's contract with sochudao is exactly one
+API + one webhook + one API key — nothing here touches the engine's DB.
 
 ## 1. `scripts/pull-combos.mjs`
 
@@ -91,10 +91,16 @@ curl -X POST "$ENGINE_URL/v1/sites/sochumenh/webhooks" \
   -d '{"url":"https://api.vercel.com/v1/integrations/deploy/prj_…/…"}'  # your deploy hook
 ```
 
-On each publish the engine POSTs `{site, template, item_count}` to that URL; your
-build re-runs `pull-combos.mjs` (which re-pulls). Publishes fire per item, so a
-5-item golden batch sends 5 triggers — deploy platforms coalesce concurrent
-builds, so this is fine.
+The registration response includes a **`webhook_secret` shown ONCE** (plus a
+`verify` block explaining the check) — store it in your secret store. On each
+publish the engine POSTs `{site, template, template_version, item_key,
+item_count}` to that URL, **HMAC-SHA256 signed** as
+`x-signature: sha256=<hex>` over the exact raw body. Raw deploy hooks ignore
+the header (harmless); if your endpoint is your own code, verify the signature
+before rebuilding — the integration kit emits a ready-made
+`scripts/verify-webhook.mjs` (constant-time compare). Publishes fire per item,
+so a 5-item golden batch sends 5 triggers — deploy platforms coalesce
+concurrent builds, so this is fine.
 
 **First go-live is still one deliberate flip** (enable the `prebuild` pull +
 set `combo-grid.config.json` to the published item_keys); the webhook automates

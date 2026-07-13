@@ -2,5 +2,5 @@
   "slug": "sochumenh",
   "name": "Số Chủ Mệnh",
   "domain": "sochumenh.vn",
-  "notes": "Tenant #1. Consumes template combo-so-chu-dao-su-menh over content-api at build time; recomputes @pseo/numerology-core to assert no drift."
+  "notes": "Tenant #1. Consumes template combo-so-chu-dao-su-menh over content-api at build time; renders engine-computed row.facts (no site-side recompute; @csessh/sochumenh handles runtime visitor input, parity-guarded in CI)."
 }

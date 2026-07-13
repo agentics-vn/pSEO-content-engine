@@ -12,7 +12,7 @@ A. SITE REPO (Claude Code + human strategist)
    real components → demo pages rendered from 2–3 hand-written sample
    `output` rows → template + work-list authored
         │  hand-off = one folder: seeds/<client>/
-        │    site.json · template.<key>.json · worklist.golden.json · ROLLOUT.md
+        │    site.json · persona.md · template.<key>.json · worklist.golden.json · ROLLOUT.md
         ▼
 B. ENGINE REPO (drop the folder — three commands)
    deno run --allow-read --config supabase/functions/deno.json \
@@ -111,7 +111,8 @@ One template = one page shape. Fill in:
 |---|---|
 | `output_schema` | the exact JSON shape their site renders |
 | `guards` | lengths, required mentions, banned phrases, numeric/entity consistency, similarity threshold — all data, no engine code |
-| `system_prompt` / `user_template` | voice + the structured facts, with `{placeholders}` and `{constraint_notes}` |
+| `persona.md` (site level) | the doctrine on EVERY page — voice, persuasion arc, guardrails; engine prepends it to every template's prompt |
+| `system_prompt` / `user_template` | TEMPLATE-specific rules only + the structured facts, with `{placeholders}` and `{constraint_notes}` (doctrine lives in persona.md, never duplicated) |
 | `model` | Sonnet-class for the golden set, Haiku-class after distillation |
 
 ## Step 3 — supply the work-list (the tenant-generic path)
@@ -147,7 +148,9 @@ sampling on top of auto-flags.
 Their backend/build pulls `GET /v1/sites/<slug>/published` with their key and
 replicates the build-time safety gate (declare the expected page list, throw
 on missing/drifted content — see `consumers/sochudao/` for the reference).
-Optionally register a webhook so publishes trigger their CI rebuild.
+Optionally register a webhook so publishes trigger their CI rebuild — the
+registration returns a `webhook_secret` once, and every ping is HMAC-signed
+(`x-signature`) with an enriched payload (`item_key`, `template_version`).
 
 **What the engine never does for a tenant:** page building, deploys, sitemaps,
 GSC/IndexNow submission, analytics. Those live in the client's stack (§9) —

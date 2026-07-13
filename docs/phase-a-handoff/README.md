@@ -61,10 +61,19 @@ reviews and publishes**.
   recompute** — re-deriving them site-side just reintroduces a fork. Merge as
   `{ ...output, ...facts }`.
 - **The publish webhook** — your go-live signal. Register a rebuild URL once
-  (`POST …/v1/sites/<slug>/webhooks` with your key + a host *deploy hook* URL)
-  and every publish triggers a fresh build automatically — no human "it's live
-  now" ping. First go-live is still one deliberate flip (enable the pull); the
-  webhook automates every publish after that.
+  (`POST …/v1/sites/<slug>/webhooks` with your key + a host *deploy hook* URL).
+  The response returns a **`webhook_secret` shown ONCE** (store it) plus a
+  `verify` block. Every publish then POSTs
+  `{site, template, template_version, item_key, item_count}`, HMAC-SHA256
+  signed as `x-signature: sha256=<hex>` over the raw body — deploy-hook URLs
+  can ignore the header; your own endpoint should verify it (the integration
+  kit ships `scripts/verify-webhook.mjs`). First go-live is still one
+  deliberate flip (enable the pull); the webhook automates every publish after
+  that.
+- **An integration starter kit** (on request): the engine side can run
+  `scripts/generate-integration-kit.mjs` over your seed and hand you generated
+  pull/verify/page-stub/JSON-LD/sitemap-submit files matching your schema — so
+  Phase C is wiring, not writing.
 
 **3. You again (Phase C — in this repo).**
 Wire `pull-combos.mjs` (see `example-pull-script.mjs`) into `prebuild` with that
@@ -76,10 +85,12 @@ build-time drift throw guards it.
   golden set** — an empty pull against a declared grid is a red build *by design*.
 - Don't remove any existing content source in this repo until that pull is green.
 
-> The shared math package (`@pseo/numerology-core`) is **owned by the engine
-> repo**. If your pages compute values, *install* it from the org registry and
-> import it — never copy it in (a local fork silently drifts from the engine;
-> that's the A1 rule). Ask the human for install access.
+> Deterministic values (numbers, labels, hub/sibling link slugs) arrive
+> **engine-computed in `row.facts`** — render them, never re-run the math
+> site-side (a local fork silently drifts from the engine; that's the A1 rule).
+> The engine's math package is intentionally unpublished. A runtime calculator
+> for *visitor input* (e.g. `@csessh/sochumenh`) is fine — it is parity-guarded
+> against the engine in CI.
 
 ## Engine facts you need
 
@@ -93,7 +104,12 @@ build-time drift throw guards it.
   repo feeds the `sochumenh` tenant.) **Pick the slug once and keep it stable** —
   it's baked into every API key and URL. Put the real public domain in `domain`.
 - **Model ids** (for `template.<key>.json` `model`): `claude-sonnet-5` for the
-  golden set, `claude-haiku-4-5` for the batch. Invented ids fail at generation.
+  golden set, `claude-haiku-4-5` for the batch. Unknown ids are **rejected** at
+  template creation.
+- **Generation is batched.** Jobs run through Anthropic Message Batches
+  (≈50% token cost; results typically land within minutes to a few hours, not
+  instantly), with automatic retry of truncated/degenerate items and auto-sized
+  output budgets. Plan review turnaround accordingly.
 - **You never get engine DB access.** The entire contract is the seed folder in +
   the HTTP pull out. Don't ask for connection strings.
 
@@ -101,13 +117,14 @@ build-time drift throw guards it.
 
 ### In this site repo (as PRs) — see `01` §1 for acceptance
 
-- **A1** Depend on the shared math/facts package if pages stand on computed values
-  (no local fork — it will diverge from the engine).
+- **A1** No local copy of the math: computed values render from `row.facts`
+  (engine-delivered per row) — never re-implemented site-side.
 - **A2** 3–5 **demo pages rendered from engine-shaped data**: hand-write sample
-  `output` rows in the exact published envelope (`01` §4) and render them through
-  the *real* page component. These become the future few-shots.
-- **A3** Build-time drift throw on the programmatic route (recompute facts; throw
-  on slug/data drift; `getStaticPaths`/route scope driven by the data file).
+  rows in the exact published envelope (`01` §4 — `output` **and** `facts`) and
+  render them through the *real* page component. These become the future few-shots.
+- **A3** Build-time drift throw on the programmatic route (structural: slug ↔
+  facts agree, declared pages all present; `getStaticPaths`/route scope driven
+  by the data file — no math re-run).
 - **A4** Hub & spoke: hub page(s) for the head term; spoke↔spoke related links
   computed from data, never hardcoded hrefs.
 - **A5** On-page baseline: `seoTitle` (≤~60 chars, distinct from the long H1),
@@ -187,14 +204,16 @@ docs/phase-a-handoff/README.md, then 01-engine-contract.md and
 
 Produce: (1) 3–5 demo pages rendered from hand-written engine-shaped data
 through the real page component, with a build-time drift throw; (2) a
-seeds/<client>/ folder (site.json, template.<key>.json, worklist.golden.json,
-keywords.csv, ROLLOUT.md) for THIS client's axis.
+seeds/<client>/ folder (site.json, persona.md, template.<key>.json,
+worklist.golden.json, keywords.csv, ROLLOUT.md) for THIS client's axis.
 
-Constraints: no local copy of shared math; keep title and seoTitle distinct;
-put length bounds in guards.length not the schema; user_template carries only
-facts + {constraint_notes}; use claude-sonnet-5 for the golden set. Run the
-self-check in README.md before handing back. If there is no real enumerable
-data axis, refuse and explain — do not invent keyword volumes.
+Constraints: site-level doctrine (voice, persuasion arc, guardrails) goes in
+persona.md, template-specific rules only in system_prompt — never duplicated;
+no local copy of shared math (render row.facts); keep title and seoTitle
+distinct; put length bounds in guards.length not the schema; user_template
+carries only facts + {constraint_notes}; use claude-sonnet-5 for the golden
+set. Run the self-check in README.md before handing back. If there is no real
+enumerable data axis, refuse and explain — do not invent keyword volumes.
 
 When done, hand back only the seeds/<client>/ folder + a one-line note; in
 return you'll get a site-scoped API key + content-api access for Phase C (see
