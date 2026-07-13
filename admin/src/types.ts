@@ -108,6 +108,8 @@ export interface CreateJobInput {
   filter?: { master?: 'exclude' | 'only'; life_paths?: number[]; destinies?: number[] };
   items?: Array<{ item_key: string; input_data: Record<string, unknown> }>;
   item_keys?: string[];
+  /** K1: item_key → search-demand priority (higher generated/reviewed first). */
+  priorities?: Record<string, number>;
 }
 
 export interface ApiResult {

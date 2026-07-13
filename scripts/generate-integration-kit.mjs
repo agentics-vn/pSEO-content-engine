@@ -139,7 +139,9 @@ await write('src/ContentPage.astro', `---
  */
 import { faqPageJsonLd } from './jsonld.mjs';
 
-const { content } = Astro.props; // one row's \`output\` from ${KEY}.generated.json
+// One pulled row: \`output\` = the prose fields, \`facts\` = engine-computed data
+// (numbers + hub/sibling link slugs) the page renders links/badges from.
+const { output: content, facts } = Astro.props.row; // rows from ${KEY}.generated.json
 ---
 <head>
   <title>{content.tagline}</title>
@@ -161,7 +163,14 @@ ${hasFaqs ? `
     ))}
   </section>` : ''}
 
-<!-- TODO: hub link(s) + sibling links — render from input_data's related slugs -->
+<!-- Internal links from ENGINE-PROVIDED data (row.facts): combo pages ship a
+     hub slug + sibling slugs, so links come from data and can't 404. The engine
+     builds these for you — do NOT re-derive them. facts.hub is the life-path
+     pillar slug (convention: so-chu-dao-<lp>); facts.siblings share the axis. -->
+${hasFaqs ? '' : ''}<nav data-links>
+  { facts?.hub && <a href={\`/\${facts.hub}\`}>Xem tổng quan số chủ đạo</a> }
+  { (facts?.siblings ?? []).map((s) => <a href={\`/\${s}\`}>{s}</a>) }
+</nav>
 <!-- TODO: CTA with UTM-tagged link into the product (§13) -->
 `);
 
@@ -512,6 +521,30 @@ await writeFile('public/feeds/${KEY}.json', JSON.stringify({
 console.log(\`[feeds] llms.txt (\${items.length} pages) + feeds/${KEY}.json written\`);
 `);
 
+// ── Webhook signature verification (the engine signs every publish ping) ─────
+await write('scripts/verify-webhook.mjs', `/**
+ * Verify a publish-ping webhook from the engine, then re-pull.
+ * The engine POSTs { site, template, template_version, item_key, item_count }
+ * to your registered URL and signs it: header \`x-signature: sha256=<hex>\` =
+ * HMAC-SHA256 of the EXACT raw body, keyed by the webhook_secret you got ONCE
+ * from POST /v1/sites/${SLUG}/webhooks. Store that secret as WEBHOOK_SECRET.
+ *
+ * Mount at your webhook route; on ok(), trigger a rebuild (which runs the pull).
+ */
+import crypto from 'node:crypto';
+
+export function verifyWebhook(rawBody, signatureHeader, secret = process.env.WEBHOOK_SECRET) {
+  if (!secret || !signatureHeader) return false;
+  const expected = 'sha256=' + crypto.createHmac('sha256', secret).update(rawBody).digest('hex');
+  const a = Buffer.from(signatureHeader);
+  const b = Buffer.from(expected);
+  return a.length === b.length && crypto.timingSafeEqual(a, b); // constant-time
+}
+
+// Example (framework-agnostic): pass the RAW body string, not a re-serialized object.
+// if (!verifyWebhook(rawBody, req.headers['x-signature'])) return res.status(401).end();
+`);
+
 // ── Checklist README ─────────────────────────────────────────────────────────
 await write('README.md', `# ${site.name} — engine integration kit
 
@@ -524,14 +557,14 @@ integrator section.
 - [ ] Fill \`assertFacts()\` — cross-check the prose against recomputed facts (§10)
 - [ ] \`ContentPage.astro\` restyled to the design system; every schema field rendered
 - [ ] ${hasFaqs ? 'FAQPage JSON-LD included (generated)' : 'Add structured data appropriate to the vertical'} + WebSite/Organization JSON-LD on the hub
-- [ ] Hub page links down to spokes with keyword-rich anchors; spokes link up + sideways (from input_data)
+- [ ] Internal links rendered from ENGINE-PROVIDED \`row.facts.hub\` + \`row.facts.siblings\` (combo pages) — do not re-derive; hub is \`so-chu-dao-<lp>\`, so make sure that pillar page exists
 - [ ] Self-referencing canonicals; www/apex redirect verified (§12 trap)
 - [ ] OG card per page (templated SVG→PNG from the page's facts)
 - [ ] Sitemap includes the cluster; \`.github/workflows/seo-index.yml\` wired (GSC WIF/SA auth + INDEXNOW_KEY secret + key file in public/; set your deploy workflow name) — submits on every deploy, weekly coverage report gates the next batch (§12)
 - [ ] Analytics: CTA/purchase events with UTM-tagged content→product links (§13)
 - [ ] Performance loop: weekly \`report-performance.mjs\` posts GSC rows per page to the engine (job in seo-index.yml; set PAGES_PREFIX + ENGINE_URL var + ${KEY_ENV} secret); revenue rows posted from analytics per \`report-revenue.example.mjs\` (join key: utm_content = item_key)
 - [ ] Answer-engine surfaces: \`generate-feeds.mjs\` in prebuild after the pull → \`public/llms.txt\` + \`public/feeds/${KEY}.json\`
-- [ ] Optional: register the CI webhook — POST /v1/sites/${SLUG}/webhooks with the site key
+- [ ] Optional: register the deploy webhook — POST /v1/sites/${SLUG}/webhooks with the site key; SAVE the \`webhook_secret\` from the response (shown once) and verify each ping with \`scripts/verify-webhook.mjs\` before rebuilding
 `);
 
 console.log(`\nintegration kit for ${SLUG} → ${outDir}`);

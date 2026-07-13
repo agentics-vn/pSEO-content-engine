@@ -80,3 +80,25 @@ export function enumerateComboGrid(): Array<{ lifePath: CoreNumber; destiny: Cor
   }
   return out;
 }
+
+// ── Internal linking (hub & spoke) as DATA ───────────────────────────────────
+// Contract A4: spoke pages link UP to a head-term hub and SIDEWAYS to siblings,
+// and those links are data the page consumes — never hardcoded hrefs. The engine
+// computes them here so buildComboInput can carry them in input_data, guaranteeing
+// the cluster's link graph resolves instead of the site hoping it does.
+
+/** Head-term (pillar) page slug a combo spoke links UP to — the life-path hub.
+ *  Convention: `so-chu-dao-<lifePath>` (documented in the Phase A contract). */
+export function lifePathHubSlug(lifePath: CoreNumber): string {
+  return `so-chu-dao-${lifePath}`;
+}
+
+/** Sibling combo slugs sharing this life-path (same số chủ đạo, other số sứ mệnh),
+ *  ordered by nearest destiny, excluding self — the sideways spoke-to-spoke links. */
+export function comboSiblings(lifePath: CoreNumber, destiny: CoreNumber, limit = 4): string[] {
+  return CORE_NUMBERS
+    .filter((d) => d !== destiny)
+    .sort((a, b) => Math.abs((a as number) - (destiny as number)) - Math.abs((b as number) - (destiny as number)))
+    .slice(0, limit)
+    .map((d) => comboSlug(lifePath, d as CoreNumber));
+}

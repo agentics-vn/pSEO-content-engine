@@ -17,6 +17,7 @@ import { dataHash } from '../_shared/hash.ts';
 import { hasFailingGate, runBatchGates, type GateResult } from '../_shared/gates/index.ts';
 import { corsHeaders, corsPreflight } from '../_shared/cors.ts';
 import { assembleItemGates } from '../prose-generate/lib.ts';
+import { KNOWN_MODELS, isKnownModel } from '../_shared/models.ts';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -49,11 +50,19 @@ export interface JobInput {
    * backend (or a CSV import in the admin UI) supplies the structured data
    * each page stands on, and the engine hashes it into the cache key.
    */
-  items?: Array<{ item_key: string; input_data: Record<string, unknown> }>;
+  items?: Array<{ item_key: string; input_data: Record<string, unknown>; priority?: number }>;
   /** Convenience for keys resolvable by a built-in input builder (combo axis). */
   item_keys?: string[];
   /** 'combo-grid' enumerates the full 12×12 axis minus already-published. */
   enumerate?: 'combo-grid';
+  /**
+   * K1: search-demand priority per item_key (higher = built/reviewed first).
+   * Real query volumes are strategy data the engine never invents — the operator
+   * derives these from keywords.csv (see scripts/keywords-to-worklist.mjs) and
+   * passes them in; the drain orders by priority DESC. Applies to the
+   * item_keys/enumerate paths; explicit `items` rows may also set `priority`.
+   */
+  priorities?: Record<string, number>;
   filter?: {
     master?: 'exclude' | 'only';
     life_paths?: number[];
@@ -146,7 +155,7 @@ export interface AdminDeps {
   /** Insert pending items; ON CONFLICT (cache key) DO NOTHING. Returns rows inserted. */
   insertItems(rows: Array<{
     site_id: string; job_id: string; template_key: string; template_version: number;
-    item_key: string; data_hash: string; input_data: unknown; status: string;
+    item_key: string; data_hash: string; input_data: unknown; status: string; priority?: number;
   }>): Promise<number>;
   /**
    * Regenerate: reset EXISTING non-published rows for these item_keys (at this
@@ -194,8 +203,8 @@ export interface AdminDeps {
     processed?: number; remaining?: number; failures?: number; error?: string;
   }>;
 
-  getWebhooks(siteId: string): Promise<Array<{ url: string }>>;
-  fireWebhook(url: string, payload: unknown): Promise<void>;
+  getWebhooks(siteId: string): Promise<Array<{ url: string; secret: string }>>;
+  fireWebhook(url: string, payload: unknown, secret?: string): Promise<void>;
 
   /** Dashboard reads. */
   listJobs(siteId: string, limit: number): Promise<Array<Record<string, unknown>>>;
@@ -322,6 +331,13 @@ export function makeAdminHandler(deps: AdminDeps, opts: { runBudgetMs?: number }
         if (!t.key || !t.name || !t.system_prompt || !t.user_template || !t.output_schema || !t.model) {
           return reply({ error: 'key, name, system_prompt, user_template, output_schema, model are required' }, 400);
         }
+        // Hard-block an unknown model at the write point (the Sonnet→Haiku flip is
+        // a new template version through here). A typo would otherwise 404 at
+        // generation — 144 failed rows + wasted spend. Add new ids to
+        // _shared/models.ts when a model ships.
+        if (!isKnownModel(t.model)) {
+          return reply({ error: `model "${t.model}" is not a known model id (${KNOWN_MODELS.join(', ')}); add it to _shared/models.ts if it is real` }, 400);
+        }
         const latest = await deps.getLatestTemplateVersion(site.site_id, t.key);
         const version = t.version ?? (latest ?? 0) + 1;
         if (latest !== null && version <= latest) {
@@ -415,15 +431,17 @@ export function makeAdminHandler(deps: AdminDeps, opts: { runBudgetMs?: number }
           created_by: userId,
         });
 
-        const rows = await Promise.all(workList.map(async ({ item_key, input_data }) => ({
+        const rows = await Promise.all(workList.map(async (w) => ({
           site_id: site.site_id,
           job_id: job.id,
           template_key: j.template_key,
           template_version: version,
-          item_key,
-          data_hash: await dataHash(input_data),
-          input_data,
+          item_key: w.item_key,
+          data_hash: await dataHash(w.input_data),
+          input_data: w.input_data,
           status: 'pending',
+          // K1: priority from the demand map, else a per-row value, else 0.
+          priority: j.priorities?.[w.item_key] ?? (w as { priority?: number }).priority ?? 0,
         })));
         const inserted = await deps.insertItems(rows);
 
@@ -722,9 +740,16 @@ export function makeAdminHandler(deps: AdminDeps, opts: { runBudgetMs?: number }
             }
             await deps.updateItem(itemId, { status: 'published', updated_at: new Date().toISOString() });
             const hooks = await deps.getWebhooks(site.site_id);
-            await Promise.allSettled(hooks.map((h) =>
-              deps.fireWebhook(h.url, { site: site.slug, template: item.template_key, item_count: 1 }),
-            ));
+            // Enriched so a consumer knows WHAT changed (not just "something did")
+            // and can do an incremental pull; HMAC-signed per hook.
+            const payload = {
+              site: site.slug,
+              template: item.template_key,
+              template_version: item.template_version,
+              item_key: item.item_key,
+              item_count: 1,
+            };
+            await Promise.allSettled(hooks.map((h) => deps.fireWebhook(h.url, payload, h.secret)));
             return reply({ ok: true, status: 'published' });
           }
         }

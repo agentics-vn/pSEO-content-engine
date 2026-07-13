@@ -202,9 +202,13 @@ export function similarityMatrix(texts: string[]): number[][] {
   return sim;
 }
 
-/** First-sentence opening key used by the phrase_frequency gate. */
-function openingKey(intro: string, tokens = 6): string {
-  const firstSentence = intro.split(/(?<=[.!?…])\s/)[0] ?? intro;
+/** Opening key for the phrase_frequency gate: first sentence of a field,
+ *  digits stamped, first `tokens` tokens. A SHORT window (4) clusters shared
+ *  openers even when a later fact word varies — the real miss that let
+ *  "Có những người vừa muốn …" (5/5) and "Trong công việc, …" (5/5) through a
+ *  6-token, intro-only check. */
+function openingKey(text: string, tokens = 4): string {
+  const firstSentence = text.split(/(?<=[.!?…])\s/)[0] ?? text;
   return firstSentence.toLowerCase().normalize('NFC')
     .replace(/[\d]+/g, '#')            // "số chủ đạo 7" and "… 4" stamp alike
     .replace(/[^\p{L}#\s]/gu, '')
@@ -237,16 +241,35 @@ export function runBatchGates(
   const freqCfg = guards.phrase_frequency;
   const maxPairwise: number = simCfg?.max_pairwise ?? 0.55;
   const maxShared: number = freqCfg?.max_shared ?? 2;
+  const freqTokens: number = freqCfg?.tokens ?? 4;
 
   const sim = simCfg !== undefined && items.length > 1
     ? similarityMatrix(items.map(it => proseOf(it.output)))
     : null;
 
+  // Which fields to scan for stamped openings: explicit `fields`, else every
+  // top-level string field the length guard bounds, else just intro. Stays
+  // domain-blind (the field list comes from the template's own guards).
+  const freqFields: string[] = freqCfg === undefined ? [] : (
+    Array.isArray(freqCfg.fields) && freqCfg.fields.length
+      ? freqCfg.fields.map(String)
+      : (() => {
+          const fromLen = [...new Set(
+            Object.keys(guards.length?.fields ?? {}).map((k: string) => k.split('.')[0]),
+          )];
+          return fromLen.length ? fromLen : ['intro'];
+        })()
+  );
+  const fieldKey = (field: string, key: string) => `${field} ${key}`;
   const openings = new Map<string, number>();
   if (freqCfg !== undefined) {
     for (const it of items) {
-      const key = openingKey(String(it.output.intro ?? ''));
-      if (key) openings.set(key, (openings.get(key) ?? 0) + 1);
+      for (const field of freqFields) {
+        const v = it.output[field];
+        if (typeof v !== 'string' || !v) continue;
+        const key = openingKey(v, freqTokens);
+        if (key) openings.set(fieldKey(field, key), (openings.get(fieldKey(field, key)) ?? 0) + 1);
+      }
     }
   }
 
@@ -266,14 +289,23 @@ export function runBatchGates(
     }
 
     if (freqCfg !== undefined) {
-      const key = openingKey(String(it.output.intro ?? ''));
-      const shared = key ? (openings.get(key) ?? 0) : 0;
+      // An item is flagged by its WORST field — the most-shared opener across
+      // every scanned field, so a stamped `career` opener trips even when the
+      // `intro` varies.
+      let worst = { field: '', key: '', shared: 0 };
+      for (const field of freqFields) {
+        const v = it.output[field];
+        if (typeof v !== 'string' || !v) continue;
+        const key = openingKey(v, freqTokens);
+        const shared = key ? (openings.get(fieldKey(field, key)) ?? 0) : 0;
+        if (shared > worst.shared) worst = { field, key, shared };
+      }
       gates.push({
         gate: 'phrase_frequency',
         severity: (freqCfg?.severity === 'fail' ? 'fail' : 'flag'),
-        passed: shared <= maxShared,
-        detail: shared > maxShared
-          ? `opening "${key}" shared by ${shared} items (max ${maxShared})` : undefined,
+        passed: worst.shared <= maxShared,
+        detail: worst.shared > maxShared
+          ? `opening "${worst.key}" in ${worst.field} shared by ${worst.shared} items (max ${maxShared})` : undefined,
       });
     }
 

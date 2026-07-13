@@ -13,7 +13,7 @@ import { buildComboInput } from '../_shared/inputs.ts';
 interface World {
   deps: AdminDeps;
   metrics: Array<{ item_key: string; clicks: number; impressions: number; avg_position: number | null; conversions: number; revenue: number }>;
-  items: Map<string, AdminItemRow & { data_hash: string }>;
+  items: Map<string, AdminItemRow & { data_hash: string; priority?: number }>;
   jobs: Map<string, {
     id: string; site_id: string; template_id: string; status: string; mode: string;
     review_sample_pct: number; anthropic_batch_id?: string | null; batch_status?: string | null; run_channel?: string;
@@ -111,6 +111,7 @@ function makeWorld(role: string = 'reviewer'): World {
           template_version: r.template_version, item_key: r.item_key, status: r.status,
           output: null, edited_output: null, validation: {}, similarity: null, regen_count: 0,
           input_data: r.input_data as Record<string, unknown>, data_hash: r.data_hash,
+          priority: r.priority ?? 0,
         });
         inserted++;
       }
@@ -262,7 +263,7 @@ function makeWorld(role: string = 'reviewer'): World {
       });
     },
 
-    getWebhooks: () => Promise.resolve([{ url: 'https://site.example/hook' }]),
+    getWebhooks: () => Promise.resolve([{ url: 'https://site.example/hook', secret: 'whsec_test' }]),
     fireWebhook: (url, payload) => {
       webhookCalls.push({ url, payload });
       return Promise.resolve();
@@ -346,6 +347,19 @@ Deno.test('POST /jobs accepts explicit (item_key, input_data) rows — any verti
   assert(rows.every((r) => r.data_hash.length === 64), 'input_data hashed into the cache key');
 });
 
+Deno.test('POST /jobs applies K1 search-demand priorities to items', async () => {
+  const w = makeWorld();
+  const res = await call(w.deps, 'POST', '/jobs', {
+    template_key: 'combo-so-chu-dao-su-menh',
+    item_keys: ['so-chu-dao-7-su-menh-3', 'so-chu-dao-1-su-menh-5'],
+    priorities: { 'so-chu-dao-7-su-menh-3': 600 }, // volume-ranked; the other defaults to 0
+  });
+  assertEquals(res.status, 201);
+  const byKey = (k: string) => [...w.items.values()].find((i) => i.item_key === k)!;
+  assertEquals(byKey('so-chu-dao-7-su-menh-3').priority, 600);
+  assertEquals(byKey('so-chu-dao-1-su-menh-5').priority, 0);
+});
+
 Deno.test('POST /jobs rejects malformed explicit rows', async () => {
   const w = makeWorld();
   const bad = await call(w.deps, 'POST', '/jobs', {
@@ -421,7 +435,11 @@ Deno.test('publish requires approved, fires webhook, and published items are imm
   assertEquals(pub.status, 200);
   assertEquals(w.items.get(id)!.status, 'published');
   assertEquals(w.webhookCalls.length, 1);
-  assertEquals((w.webhookCalls[0].payload as { site: string }).site, 'sochumenh');
+  // W1a: payload identifies WHAT changed so a consumer can pull incrementally.
+  const wp = w.webhookCalls[0].payload as { site: string; template: string; item_key: string; template_version: number };
+  assertEquals(wp.site, 'sochumenh');
+  assertEquals(wp.item_key, w.items.get(id)!.item_key);
+  assertEquals(typeof wp.template_version, 'number');
 
   // One-way: edit and reject must refuse on a published item.
   assertEquals((await call(w.deps, 'POST', `/items/${id}/edit`, { edited_output: { intro: 'x' } })).status, 409);

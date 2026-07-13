@@ -44,7 +44,7 @@ export interface ContentApiDeps {
     sinceVersion?: number;
     sinceUpdatedAt?: string;
   }): Promise<PublishedRow[]>;
-  registerWebhook(siteId: string, url: string): Promise<{ id: string }>;
+  registerWebhook(siteId: string, url: string): Promise<{ id: string; secret: string }>;
   /** Upsert on (site_id, item_key, date, source); returns rows written. */
   upsertMetrics(siteId: string, source: 'gsc' | 'analytics', rows: MetricsRow[]): Promise<number>;
 }
@@ -153,7 +153,22 @@ export function makeContentApiHandler(deps: ContentApiDeps) {
         return json({ error: 'url must be a public https endpoint' }, 400);
       }
       const hook = await deps.registerWebhook(site.id, body.url);
-      return json({ ok: true, webhook_id: hook.id }, 201);
+      // The signing secret is returned ONCE. Surface HOW to verify right here so
+      // the integrator never has to hunt for a doc: the `verify` block is the
+      // whole contract for authenticating a publish ping.
+      return json({
+        ok: true,
+        webhook_id: hook.id,
+        webhook_secret: hook.secret,
+        verify: {
+          header: 'x-signature',
+          scheme: 'sha256=<hex>',
+          how: 'HMAC-SHA256 over the EXACT raw request body, keyed by webhook_secret; constant-time compare to the x-signature header.',
+          node: "crypto.createHmac('sha256', WEBHOOK_SECRET).update(rawBody).digest('hex')",
+          payload: 'JSON: { site, template, template_version, item_key, item_count } — then re-pull GET /v1/sites/<slug>/published',
+          store_now: 'webhook_secret is shown only once; save it to your secret store before responding.',
+        },
+      }, 201);
     }
 
     // The performance loop's write path: the SITE (which holds the GSC and
