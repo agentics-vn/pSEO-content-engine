@@ -127,6 +127,12 @@ const deps: BatchDeps = {
     if (error) throw error;
     return data as TemplateRow | null;
   },
+  async getSitePersona(siteId) {
+    const { data, error } = await supabase.from('sites')
+      .select('persona').eq('id', siteId).maybeSingle();
+    if (error) throw error;
+    return (data?.persona as string | null) ?? null;
+  },
   async saveResult(item, patch) {
     const { error } = await supabase.from('prose_items')
       .update({ ...patch, updated_at: new Date().toISOString() })
@@ -221,6 +227,8 @@ Deno.serve(async (req: Request) => {
     template?: TemplateRow;
     input_data?: Record<string, unknown>;
     item_key?: string;
+    /** Site persona for dry-run — supplied by prose-admin (this envelope has no site_id). */
+    persona?: string | null;
   };
   try {
     body = await req.json();
@@ -257,6 +265,7 @@ Deno.serve(async (req: Request) => {
         template: body.template,
         input_data: body.input_data,
         item_key: body.item_key,
+        persona: body.persona,
       });
       return json(result, result.ok ? 200 : 422);
     } catch (err) {

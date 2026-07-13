@@ -13,7 +13,7 @@
  *   generateItem       the per-item flow with injected db/llm deps
  */
 
-import { dataHash } from '../_shared/hash.ts';
+import { dataHash, sha256Hex } from '../_shared/hash.ts';
 import {
   runItemGates,
   hasFailingGate,
@@ -345,6 +345,9 @@ export interface LlmResult {
 export interface GenerateDeps {
   getItem(itemId: string): Promise<ItemRow | null>;
   getTemplate(siteId: string, key: string, version: number): Promise<TemplateRow | null>;
+  /** Site-level persona/doctrine prepended to every template's system_prompt.
+   *  null = none (generation byte-identical to pre-persona behavior). */
+  getSitePersona(siteId: string): Promise<string | null>;
   saveResult(item: ItemRow, patch: {
     output: Record<string, unknown>;
     status: string;
@@ -368,6 +371,9 @@ export interface DryRunRequest {
   template: TemplateRow;
   input_data: Record<string, unknown>;
   item_key?: string;
+  /** Site persona, supplied by the CALLER (prose-admin fetches it — dry-run has
+   *  no site_id and stays DB-free). */
+  persona?: string | null;
 }
 
 /** Ceiling for auto-sized and retry-bumped output budgets (well under model caps). */
@@ -423,6 +429,13 @@ export function estimateOutputTokens(template: Pick<TemplateRow, 'guards'>): num
   return Math.ceil(tokens * 1.15);       // margin
 }
 
+/** Short audit hash for a site persona (null when there is none). */
+export async function personaHashOf(persona: string | null): Promise<string | null> {
+  const trimmed = persona?.trim();
+  if (!trimmed) return null;
+  return (await sha256Hex(trimmed)).slice(0, 12);
+}
+
 /** Auto-sized output budget: never below the template's explicit value, and the
  *  cap bounds only the schema-derived estimate (so a template that deliberately
  *  sets a very high max_tokens is honored, not silently lowered to the cap). */
@@ -439,12 +452,17 @@ export function bumpMaxTokens(current: number, factor = 1.7): number {
 /**
  * Build the LLM request for one item: constraint notes, few-shots, strict schema.
  * Shared by sync generate, batch submit, and dry-run. `maxTokensOverride` lets
- * P1 re-issue a truncated item with a bumped budget.
+ * P1 re-issue a truncated item with a bumped budget. `persona` is the SITE-level
+ * doctrine (sites.persona) prepended before the template's own system_prompt —
+ * one doctrine per site, inherited by every template, so persuasion/voice rules
+ * never get copy-pasted per template. Null/empty persona → byte-identical
+ * behavior to pre-persona builds (and the T1 cached prefix stays byte-identical
+ * per (template, persona), so caching is unaffected).
  */
 export function buildItemLlmRequest(
   item: Pick<ItemRow, 'item_key' | 'input_data'>,
   template: TemplateRow,
-  opts?: { maxTokensOverride?: number },
+  opts?: { maxTokensOverride?: number; persona?: string | null },
 ): LlmRequest {
   const notes = constraintNotes(template.output_schema, template.guards);
   const withNotes = template.user_template.includes('{constraint_notes}')
@@ -452,7 +470,8 @@ export function buildItemLlmRequest(
     : `${template.user_template}\n\n${notes}`;
   const userPrompt = fillTemplate(withNotes, item.input_data);
 
-  let system = template.system_prompt;
+  const persona = typeof opts?.persona === 'string' ? opts.persona.trim() : '';
+  let system = persona ? `${persona}\n\n${template.system_prompt}` : template.system_prompt;
   const fewShots = (template.few_shots ?? []).filter(
     (shot) => !(shot && typeof shot === 'object' && (shot as { item_key?: string }).item_key === item.item_key),
   );
@@ -482,6 +501,10 @@ export async function finalizeItemFromLlm(
   opts: {
     mode?: 'generate' | 'regenerate';
     usageChannel: 'batch' | 'sync';
+    /** Audit stamp: first 12 hex of sha256(site persona) the item was generated
+     *  under, so "which doctrine produced this page" stays answerable after the
+     *  (mutable) persona changes. Absent when the site has no persona. */
+    personaHash?: string | null;
   },
 ): Promise<{ status: string; gates: GateResult[] }> {
   await deps.addJobUsage(item.job_id, llmResult.tokensIn, llmResult.tokensOut, opts.usageChannel);
@@ -501,7 +524,11 @@ export async function finalizeItemFromLlm(
   await deps.saveResult(item, {
     output,
     status,
-    validation: { gates, review_sampled: sampled },
+    validation: {
+      gates,
+      review_sampled: sampled,
+      ...(opts.personaHash ? { persona_hash: opts.personaHash } : {}),
+    },
     regen_count: opts.mode === 'regenerate' ? item.regen_count + 1 : item.regen_count,
     tokens_in: tokensIn,
     tokens_out: tokensOut,
@@ -576,7 +603,11 @@ export async function generateItem(deps: GenerateDeps, req: GenerateRequest): Pr
     return { ok: false, error: `template ${item.template_key} v${item.template_version} not found` };
   }
 
-  let llmReq = buildItemLlmRequest(item, template);
+  // Site persona fetched ONCE per invocation — both attempts of a P1 retry are
+  // guaranteed to run under the same doctrine.
+  const persona = await deps.getSitePersona(item.site_id);
+
+  let llmReq = buildItemLlmRequest(item, template, { persona });
   let llmResult = await deps.llm(llmReq);
 
   // P1: a truncated (max_tokens) or degenerate (stub/duplicate shell) result is
@@ -585,7 +616,7 @@ export async function generateItem(deps: GenerateDeps, req: GenerateRequest): Pr
   // billed at job level.
   if (llmResult.stopReason === 'max_tokens' || isDegenerate(llmResult.output)) {
     const wasted = llmResult;
-    llmReq = buildItemLlmRequest(item, template, { maxTokensOverride: bumpMaxTokens(llmReq.maxTokens) });
+    llmReq = buildItemLlmRequest(item, template, { maxTokensOverride: bumpMaxTokens(llmReq.maxTokens), persona });
     llmReq.temperature = Math.min(1, template.temperature + 0.2);
     llmResult = await deps.llm(llmReq);
     // Fold the wasted attempt's tokens into the result so finalizeItemFromLlm
@@ -601,6 +632,7 @@ export async function generateItem(deps: GenerateDeps, req: GenerateRequest): Pr
   const { status, gates } = await finalizeItemFromLlm(deps, item, template, llmResult, {
     mode: req.mode,
     usageChannel: 'sync',
+    personaHash: await personaHashOf(persona),
   });
 
   return { ok: true, status, cached: false, item_key: item.item_key, gates };
@@ -628,6 +660,7 @@ export async function dryRunTemplate(
     const llmReq = buildItemLlmRequest(
       { item_key: itemKey, input_data: req.input_data },
       template,
+      { persona: req.persona },
     );
     const llmResult = await deps.llm(llmReq);
     const output = coerceToSchema(llmResult.output, template.output_schema) as Record<string, unknown>;
@@ -743,6 +776,9 @@ export async function submitBatchJob(
   }
 
   const templateCache = new Map<string, TemplateRow | null>();
+  // Site persona, cached per site like templates (a job's items share a site
+  // today, but the idiom costs nothing and stays correct if that changes).
+  const personaCache = new Map<string, string | null>();
   const requests: Array<{ custom_id: string; params: AnthropicMessageParams }> = [];
 
   for (const item of pending) {
@@ -754,6 +790,12 @@ export async function submitBatchJob(
     }
     if (!template) continue;
 
+    let persona = personaCache.get(item.site_id);
+    if (persona === undefined) {
+      persona = await deps.getSitePersona(item.site_id);
+      personaCache.set(item.site_id, persona);
+    }
+
     const expectedHash = await dataHash(item.input_data);
     if (expectedHash !== item.data_hash) continue;
 
@@ -761,7 +803,7 @@ export async function submitBatchJob(
     // bumped budget so the retry doesn't hit the same wall.
     const retry = Number((item.validation as { gen_retry?: unknown } | null)?.gen_retry ?? 0);
     const override = retry > 0 ? bumpMaxTokens(sizedMaxTokens(template), 1 + 0.7 * retry) : undefined;
-    const llmReq = buildItemLlmRequest(item, template, override ? { maxTokensOverride: override } : undefined);
+    const llmReq = buildItemLlmRequest(item, template, { maxTokensOverride: override, persona });
     requests.push({ custom_id: item.id, params: toMessageParams(llmReq) });
   }
 
@@ -821,6 +863,11 @@ export async function collectBatchJob(
   }
 
   const templateCache = new Map<string, TemplateRow | null>();
+  // Persona hash for the audit stamp. Fetched at collect time: if the persona
+  // changed while the batch was in flight (rare; load-seed warns loudly and
+  // recommends a version bump) the stamp reflects the newer doctrine — an
+  // accepted v1 approximation.
+  const personaHashCache = new Map<string, string | null>();
   let processed = 0;
   let failures = 0;
   const mode = job.mode === 'regenerate' ? 'regenerate' as const : 'generate' as const;
@@ -858,7 +905,12 @@ export async function collectBatchJob(
           `${llmResult.stopReason === 'max_tokens' ? 'truncated' : 'degenerate'} — requeued (retry ${retry + 1})`);
         continue;
       }
-      await finalizeItemFromLlm(deps, item, template, llmResult, { mode, usageChannel: 'batch' });
+      let personaHash = personaHashCache.get(item.site_id);
+      if (personaHash === undefined) {
+        personaHash = await personaHashOf(await deps.getSitePersona(item.site_id));
+        personaHashCache.set(item.site_id, personaHash);
+      }
+      await finalizeItemFromLlm(deps, item, template, llmResult, { mode, usageChannel: 'batch', personaHash });
       processed++;
     } else {
       failures++;
