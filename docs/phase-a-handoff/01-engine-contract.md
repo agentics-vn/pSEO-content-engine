@@ -41,12 +41,36 @@ strategy + demo pages   →   validate → load → jobs →  webhook → pull �
 seeds/<client>/
   # ── the engine INGESTS these (validate-seed / load-seed read them) ──
   site.json               # {slug, name, domain}
+  persona.md              # OPTIONAL — site-level doctrine (see below)
   template.<key>.json     # §2 — the contract's core
   worklist.golden.json    # §3 — golden-set job body (or rely on a built-in enumerator)
   # ── strategy COMPANIONS (travel with the drop for human review; engine never reads them) ──
   keywords.csv            # query,volume_mo,maps_to,source — REAL tool data, source named
   ROLLOUT.md              # phases by demand, sampling %, refresh cadence
 ```
+
+**`persona.md` — the site-level doctrine layer.** One markdown file holding the
+doctrine that must hold on EVERY page of the site regardless of template: brand
+voice, the persuasion arc (e.g. "name the reader's real problem → position this
+site as the resolution"), ethical guardrails. The engine prepends it to every
+template's `system_prompt` at generation, so N templates inherit one doctrine by
+construction. Rules:
+
+- **Never duplicate**: doctrine lives in `persona.md`; a template's
+  `system_prompt` carries ONLY template-specific rules (fact rules, arithmetic,
+  anti-stamp, `{constraint_notes}` mechanics). Duplicated doctrine makes the
+  model split the difference unpredictably.
+- **Mutability asymmetry**: template versions are immutable; the persona is
+  deliberately mutable site config. Re-running `load-seed` with a changed
+  `persona.md` updates it for ALL future generations (published pages are
+  immutable) — load-seed prints a loud diff when this happens. An absent file
+  leaves the stored persona untouched; an empty file explicitly clears it.
+- **Material persona change ⇒ template version bump + few-shot refresh.**
+  Few-shots are concrete examples and dominate style; stale few-shots exemplifying
+  the old doctrine will defeat a new persona. Re-golden (100% review) after
+  adopting or materially changing a persona.
+- Each item records the `persona_hash` it was generated under (in `validation`),
+  so "which doctrine produced this page" stays answerable.
 
 Only the first three are read by the engine; `validate-seed` requires
 `site.json` + at least one `template.*.json` (a `worklist*.json` is checked when

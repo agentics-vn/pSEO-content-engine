@@ -42,6 +42,23 @@ try {
   err(`site.json: ${e instanceof Error ? e.message : e}`);
 }
 
+// ── persona.md (optional, site-level doctrine — see phase-a-handoff §1) ─────
+try {
+  const persona = await Deno.readTextFile(`${seedDir}/persona.md`);
+  const trimmed = persona.trim();
+  if (trimmed === '') {
+    warn('persona.md: EMPTY — loading this seed will CLEAR the site persona (delete the file to leave it untouched)');
+  } else {
+    if (persona.normalize('NFC') !== persona) warn('persona.md: not NFC-normalized — load-seed will normalize, but fix the source');
+    if ([...trimmed].length > 6000) {
+      warn(`persona.md: unusually long (${[...trimmed].length} chars) — persona rides the cached prompt prefix (cheap), but confirm it is doctrine, not content`);
+    }
+    console.log(`  persona.md present (${[...trimmed].length} chars) — applied to EVERY template of this site at generation`);
+  }
+} catch {
+  // absent — fine; the site persona (if any) stays untouched on load.
+}
+
 // ── templates ────────────────────────────────────────────────────────────────
 import { KNOWN_MODELS } from '../supabase/functions/_shared/models.ts';
 const templates: Array<Record<string, any>> = [];

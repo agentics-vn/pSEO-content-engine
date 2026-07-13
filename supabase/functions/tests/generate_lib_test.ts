@@ -11,6 +11,7 @@ import {
   coerceToSchema,
   collectBatchJob,
   constraintNotes,
+  dryRunTemplate,
   estimateOutputTokens,
   fillTemplate,
   finalizeItemFromLlm,
@@ -187,7 +188,7 @@ function validItem(): Record<string, unknown> {
   };
 }
 
-async function makeFakeWorld(llmOutput?: unknown) {
+async function makeFakeWorld(llmOutput?: unknown, opts?: { persona?: string | null }) {
   const inputData = buildComboInput('so-chu-dao-7-su-menh-3') as unknown as Record<string, unknown>;
   const item: ItemRow = {
     id: 'item-1', site_id: 'site-1', job_id: 'job-1',
@@ -202,10 +203,11 @@ async function makeFakeWorld(llmOutput?: unknown) {
     output_schema: seed.output_schema, few_shots: [], guards: seed.guards,
     model: seed.model, temperature: seed.temperature, max_tokens: seed.max_tokens,
   };
-  const calls = { llm: 0, usage: [] as Array<[number, number]> };
+  const calls = { llm: 0, usage: [] as Array<[number, number]>, systems: [] as string[], personaFetches: 0 };
   const deps: GenerateDeps = {
     getItem: (id) => Promise.resolve(id === item.id ? { ...item } : null),
     getTemplate: () => Promise.resolve(template),
+    getSitePersona: () => { calls.personaFetches++; return Promise.resolve(opts?.persona ?? null); },
     saveResult: (it, patch) => {
       Object.assign(item, patch);
       return Promise.resolve();
@@ -215,8 +217,9 @@ async function makeFakeWorld(llmOutput?: unknown) {
       return Promise.resolve();
     },
     getJobReviewPct: () => Promise.resolve(0),
-    llm: (_req): Promise<LlmResult> => {
+    llm: (req): Promise<LlmResult> => {
       calls.llm++;
+      calls.systems.push(req.system);
       return Promise.resolve({ output: llmOutput ?? validItem(), tokensIn: 1200, tokensOut: 900 });
     },
   };
@@ -381,6 +384,7 @@ async function makeBatchWorld(opts: {
   batchId?: string | null;
   status?: string;
   results?: Array<{ custom_id: string; result: Record<string, unknown> }>;
+  persona?: string | null;
 } = {}) {
   const inputData = buildComboInput('so-chu-dao-7-su-menh-3') as unknown as Record<string, unknown>;
   const item: ItemRow = {
@@ -399,7 +403,7 @@ async function makeBatchWorld(opts: {
   const job: Record<string, unknown> = {
     id: 'job-1', mode: 'generate', anthropic_batch_id: opts.batchId ?? null, batch_status: null,
   };
-  const calls = { create: 0, retry: [] as string[], failure: [] as string[], usage: [] as Array<[number, number, string?]> };
+  const calls = { create: 0, retry: [] as string[], failure: [] as string[], usage: [] as Array<[number, number, string?]>, personaFetches: 0 };
   const batchApi: AnthropicBatchApi = {
     create: (_reqs) => { calls.create++; return Promise.resolve({ id: 'batch-1' }); },
     retrieve: (_id) => Promise.resolve({ processing_status: opts.status ?? 'ended', request_counts: { succeeded: 1 } }),
@@ -409,6 +413,7 @@ async function makeBatchWorld(opts: {
   const deps: BatchDeps = {
     getItem: (id) => Promise.resolve(id === item.id ? { ...item } : null),
     getTemplate: () => Promise.resolve(template),
+    getSitePersona: () => { calls.personaFetches++; return Promise.resolve(opts.persona ?? null); },
     saveResult: (_it, patch) => { Object.assign(item, patch); return Promise.resolve(); },
     addJobUsage: (_j, tin, tout, ch) => { calls.usage.push([tin, tout, ch]); return Promise.resolve(); },
     getJobReviewPct: () => Promise.resolve(0),
@@ -478,4 +483,81 @@ Deno.test('P1 batch: a truncated succeeded result is re-queued once, then finali
   await collectBatchJob(w.deps, w.batchApi, 'job-1');
   assertEquals(w.calls.retry.length, 1);       // no second retry
   assert(w.item.status !== 'pending', 'finalized on the capped retry');
+});
+
+// ── Site persona / doctrine layer ─────────────────────────────────────────────
+
+Deno.test('persona: prepended before the template prompt and few-shots; null/empty → byte-identical (release gate)', async () => {
+  const { template } = await makeFakeWorld();
+  const inputData = buildComboInput('so-chu-dao-7-su-menh-3') as unknown as Record<string, unknown>;
+  const item = { item_key: 'so-chu-dao-7-su-menh-3', input_data: inputData };
+  const tplWithShots: TemplateRow = { ...template, few_shots: [{ item_key: 'so-chu-dao-1-su-menh-5', output: { intro: 'ví dụ' } }] };
+
+  const doctrine = 'DOCTRINE: gọi tên vấn đề của người đọc; định vị sochumenh là lời giải.';
+  const withPersona = buildItemLlmRequest(item, tplWithShots, { persona: doctrine });
+  assert(withPersona.system.startsWith(doctrine + '\n\n'), 'persona leads the system prompt');
+  assert(withPersona.system.indexOf(doctrine) < withPersona.system.indexOf('VÍ DỤ THAM KHẢO'), 'persona precedes few-shots');
+
+  // Release gate: absent/null/empty persona are all byte-identical to the pre-persona build.
+  const base = buildItemLlmRequest(item, tplWithShots);
+  assertEquals(buildItemLlmRequest(item, tplWithShots, { persona: null }).system, base.system);
+  assertEquals(buildItemLlmRequest(item, tplWithShots, { persona: '' }).system, base.system);
+  assertEquals(buildItemLlmRequest(item, tplWithShots, { persona: '   ' }).system, base.system);
+  assert(base.system.startsWith(tplWithShots.system_prompt.slice(0, 40)));
+});
+
+Deno.test('persona: generateItem fetches once, applies to BOTH attempts of a P1 retry, stamps persona_hash', async () => {
+  const doctrine = 'DOCTRINE: luôn nối vấn đề với giải pháp.';
+  const w = await makeFakeWorld(undefined, { persona: doctrine });
+  // First call truncates → P1 retry; both systems must carry the doctrine.
+  let call = 0;
+  w.deps.llm = (req): Promise<LlmResult> => {
+    call++;
+    w.calls.systems.push(req.system);
+    return Promise.resolve(call === 1
+      ? { output: validItem(), tokensIn: 100, tokensOut: 4500, stopReason: 'max_tokens' }
+      : { output: validItem(), tokensIn: 100, tokensOut: 900 });
+  };
+  const res = await w.deps.getItem('item-1');
+  assert(res);
+  const out = await generateItem(w.deps, { item_id: 'item-1' });
+  assertEquals(out.ok, true);
+  assertEquals(w.calls.systems.length, 2);
+  assert(w.calls.systems.every((s) => s.startsWith(doctrine)), 'persona on initial AND retry build');
+  assertEquals(w.calls.personaFetches, 1, 'fetched once per invocation');
+  const validation = w.item.validation as { persona_hash?: string };
+  assertEquals(typeof validation.persona_hash, 'string');
+  assertEquals(validation.persona_hash!.length, 12);
+});
+
+Deno.test('persona: no-persona site stamps nothing (validation has no persona_hash)', async () => {
+  const w = await makeFakeWorld();
+  await generateItem(w.deps, { item_id: 'item-1' });
+  assertEquals((w.item.validation as { persona_hash?: string }).persona_hash, undefined);
+});
+
+Deno.test('persona: batch submit applies it per item and caches the fetch', async () => {
+  const doctrine = 'DOCTRINE: mỗi trang thuyết phục đúng một hành trình.';
+  const w = await makeBatchWorld({ batchId: null, persona: doctrine });
+  const captured: string[] = [];
+  const res = await submitBatchJob(w.deps, w.batchApi, (r) => { captured.push((r as { system: string }).system); return r; }, 'job-1');
+  assertEquals(res.ok, true);
+  assertEquals(captured.length, 1);
+  assert(captured[0].startsWith(doctrine), 'batch request system carries the persona');
+  assertEquals(w.calls.personaFetches, 1);
+});
+
+Deno.test('persona: dry-run applies req.persona without any DB dep', async () => {
+  const { template } = await makeFakeWorld();
+  const systems: string[] = [];
+  const llm = (req: { system: string }): Promise<LlmResult> => {
+    systems.push(req.system);
+    return Promise.resolve({ output: validItem(), tokensIn: 10, tokensOut: 10 });
+  };
+  const inputData = buildComboInput('so-chu-dao-7-su-menh-3') as unknown as Record<string, unknown>;
+  const res = await dryRunTemplate({ llm } as Pick<GenerateDeps, 'llm'>, {
+    template, input_data: inputData, item_key: 'so-chu-dao-7-su-menh-3', persona: 'DOCTRINE dry-run.',
+  });
+  assertEquals(res.ok, true);
+  assert(systems[0].startsWith('DOCTRINE dry-run.'));
 });

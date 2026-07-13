@@ -24,6 +24,13 @@ not caught at review.
 ## Produce (all in one PR on a feature branch)
 
 1. `seeds/<client>/site.json` — slug, name, domain from the brief.
+1b. `seeds/<client>/persona.md` — the SITE-LEVEL doctrine from `brief.voice`
+   (persona, tone, do_nots) plus the persuasion arc and ethical guardrails
+   that must hold on every page regardless of template. The engine prepends
+   this to EVERY template's system_prompt at generation — author it once,
+   never copy it into templates. Loaded by load-seed; mutable site config
+   (changes print a loud diff and should accompany a template version bump +
+   few-shot refresh).
 2. `seeds/<client>/template.<key>.json`:
    - `output_schema`: one field per SERP-worthy section (read the serp_refs;
      mirror what winners rank with, not what's easy to generate). Always:
@@ -35,8 +42,10 @@ not caught at review.
      brief.compliance; `numeric_consistency`/`entity_consistency` over the
      brief's fact_fields; `similarity` ≤ 0.55; `faq_shape` with count and
      answers_must_contain for the load-bearing facts.
-   - `system_prompt`: voice/persona/do_nots from the brief + the anti-stamp
-     instruction (vary openings) + "facts only from provided data".
+   - `system_prompt`: TEMPLATE-SPECIFIC rules only — domain fact rules, the
+     anti-stamp instruction (vary openings), "facts only from provided data".
+     Site-level doctrine/voice lives in `persona.md` (1b); never duplicate it
+     here — duplicated doctrine makes the model split the difference.
    - `user_template`: ONLY `{placeholders}` over fact_fields +
      `{constraint_notes}`. No voice here.
    - `model`: Sonnet-class; note the Haiku switch after distillation.

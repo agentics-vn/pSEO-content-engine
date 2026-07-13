@@ -60,14 +60,20 @@ const deps: AdminDeps = {
     if (error) throw error;
     return data;
   },
-  async invokeDryRun(_siteId, template, inputData, itemKey) {
+  async getSite(siteId) {
+    const { data, error } = await supabase.from('sites')
+      .select('name, persona, persona_updated_at').eq('id', siteId).maybeSingle();
+    if (error) throw error;
+    return data as { name: string; persona: string | null; persona_updated_at: string | null } | null;
+  },
+  async invokeDryRun(_siteId, template, inputData, itemKey, persona) {
     const res = await fetch(`${SUPABASE_URL}/functions/v1/prose-generate`, {
       method: 'POST',
       headers: {
         authorization: `Bearer ${SERVICE_ROLE_KEY}`,
         'content-type': 'application/json',
       },
-      body: JSON.stringify({ dry_run: true, template, input_data: inputData, item_key: itemKey }),
+      body: JSON.stringify({ dry_run: true, template, input_data: inputData, item_key: itemKey, persona }),
     });
     return await res.json();
   },

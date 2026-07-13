@@ -47,10 +47,59 @@ if (templates.length === 0) {
 const { data: siteRow, error: siteErr } = await supabase
   .from('sites')
   .upsert({ slug: site.slug, name: site.name }, { onConflict: 'slug' })
-  .select('id, slug')
+  .select('id, slug, persona')
   .single();
 if (siteErr) throw siteErr;
 console.log(`site ${siteRow.slug} → ${siteRow.id}`);
+
+// 1b. Site persona (seeds/<client>/persona.md → sites.persona). Three states:
+//   - file ABSENT   → existing DB value untouched (a template-only re-run must
+//                     never clobber or clear a persona)
+//   - file NON-EMPTY→ NFC-normalize + trim, set persona (+ persona_updated_at
+//                     when the value actually changed)
+//   - file EMPTY    → explicit clear (documented escape hatch)
+// Persona is deliberately MUTABLE site config (unlike immutable template
+// versions) — so a change is loud, not silent.
+const sha12 = async (s: string) => {
+  const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
+  return [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, '0')).join('').slice(0, 12);
+};
+let personaFile: string | null = null;
+try {
+  personaFile = await Deno.readTextFile(`${seedDir}/persona.md`);
+} catch {
+  personaFile = null; // absent
+}
+if (personaFile === null) {
+  console.log('persona.md: absent — site persona untouched');
+} else {
+  const next = personaFile.normalize('NFC').trim();
+  const current = (siteRow.persona as string | null) ?? null;
+  const changed = next !== (current ?? '');
+  if (!changed) {
+    console.log(`persona: unchanged (sha ${await sha12(next)})`);
+  } else {
+    const patch = next === ''
+      ? { persona: null, persona_updated_at: new Date().toISOString() }
+      : { persona: next, persona_updated_at: new Date().toISOString() };
+    const { error: pErr } = await supabase.from('sites').update(patch).eq('id', siteRow.id);
+    if (pErr) throw pErr;
+    if (next === '') {
+      console.log('persona: CLEARED (empty persona.md)');
+    } else if (!current) {
+      console.log(`persona: SET (${[...next].length} chars, sha ${await sha12(next)})`);
+    } else {
+      console.log(`persona: CHANGED (sha ${await sha12(current)} → ${await sha12(next)})`);
+    }
+    if (next !== '' || current) {
+      console.log(
+        '  ⚠ affects ALL future generations for this site — including re-submits of\n' +
+        '    retried items in RUNNING jobs. For templates tuned under the old doctrine,\n' +
+        '    bump the template version and refresh few_shots (see phase-a-handoff docs).',
+      );
+    }
+  }
+}
 
 // 2. Templates (immutable per version — skip if the version already exists).
 for (const t of templates) {

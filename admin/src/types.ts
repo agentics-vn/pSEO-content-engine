@@ -124,6 +124,7 @@ export interface DataSource {
   adminName: string;
   load(): Promise<DashboardData>;
   metrics(): Promise<MetricsSummary | null>;
+  getSiteInfo(): Promise<{ slug: string; name: string; persona: string | null; persona_updated_at: string | null } | null>;
   listTemplates(): Promise<TemplateRow[]>;
   getTemplate(key: string, version?: number): Promise<TemplateFull | null>;
   createTemplate(row: Omit<TemplateFull, 'id' | 'version' | 'created_at'> & { version?: number }): Promise<ApiResult>;

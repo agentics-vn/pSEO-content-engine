@@ -18,11 +18,13 @@ export function TemplatesPage({
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showTest, setShowTest] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [siteInfo, setSiteInfo] =
+    useState<{ persona: string | null; persona_updated_at: string | null } | null>(null);
 
   const templateList = useMemo(() => latestPerKey(list), [list]);
 
   const reload = () => source.listTemplates().then(setList);
-  useEffect(() => { reload(); }, [source]);
+  useEffect(() => { reload(); source.getSiteInfo().then(setSiteInfo); }, [source]);
 
   const loadTemplate = async (key: string) => {
     setSelected(key);
@@ -70,6 +72,32 @@ export function TemplatesPage({
           <p>Save creates a new immutable version</p>
         </div>
       </div>
+
+      <section className="card persona-card">
+        <div className="section-head">
+          <h2>Site persona</h2>
+          <span className="meta">
+            {siteInfo?.persona
+              ? `active${siteInfo.persona_updated_at ? ` · updated ${siteInfo.persona_updated_at.slice(0, 10)}` : ''}`
+              : 'none'}
+          </span>
+        </div>
+        {siteInfo?.persona ? (
+          <details>
+            <summary className="hint">
+              Prepended to EVERY template's system prompt at generation — read-only here;
+              owned by the site seed (persona.md + load-seed).
+            </summary>
+            <pre className="code-preview" style={{ marginTop: 8 }}>{siteInfo.persona}</pre>
+          </details>
+        ) : (
+          <p className="hint">
+            No site persona set. Doctrine that should hold on every page (voice, persuasion
+            arc, guardrails) belongs in <code>seeds/&lt;site&gt;/persona.md</code>, loaded via
+            load-seed — not copy-pasted into each template's system prompt.
+          </p>
+        )}
+      </section>
 
       <div className="templates-layout">
         <aside className="card template-list">
