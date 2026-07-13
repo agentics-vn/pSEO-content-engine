@@ -142,7 +142,10 @@ export interface AdminDeps {
   }>>;
   getTemplateFull(siteId: string, key: string, version: number): Promise<Record<string, unknown> | null>;
   insertTemplate(siteId: string, userId: string, row: TemplateInput & { version: number }): Promise<{ id: string; version: number }>;
-  invokeDryRun(siteId: string, template: Record<string, unknown>, inputData: Record<string, unknown>, itemKey?: string): Promise<{
+  /** Site persona (sites.persona) — fetched here so the dry-run proxy can carry
+   *  it (the dry-run envelope has no site_id and prose-generate stays DB-free). */
+  getSitePersona(siteId: string): Promise<string | null>;
+  invokeDryRun(siteId: string, template: Record<string, unknown>, inputData: Record<string, unknown>, itemKey?: string, persona?: string | null): Promise<{
     ok: boolean; output?: Record<string, unknown>; gates?: GateResult[];
     tokens_in?: number; tokens_out?: number; error?: string;
   }>;
@@ -321,7 +324,9 @@ export function makeAdminHandler(deps: AdminDeps, opts: { runBudgetMs?: number }
         if (version === null) return reply({ error: `no template "${t.key}"` }, 404);
         const tpl = await deps.getTemplateFull(site.site_id, t.key, version);
         if (!tpl) return reply({ error: `no template "${t.key}" v${version}` }, 404);
-        const result = await deps.invokeDryRun(site.site_id, tpl, t.input_data, t.item_key);
+        // Thread the site persona so Template Studio tests match real generation.
+        const persona = await deps.getSitePersona(site.site_id);
+        const result = await deps.invokeDryRun(site.site_id, tpl, t.input_data, t.item_key, persona);
         return reply(result, result.ok ? 200 : 422);
       }
 

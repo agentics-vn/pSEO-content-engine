@@ -25,11 +25,14 @@ interface World {
   }>;
   webhookCalls: Array<{ url: string; payload: unknown }>;
   generateCalls: string[];
+  dryRunCalls: Array<{ persona: string | null }>;
 }
 
-function makeWorld(role: string = 'reviewer'): World {
+function makeWorld(role: string = 'reviewer', opts?: { persona?: string | null }): World {
   let seq = 0;
   const uid = () => `00000000-0000-0000-0000-${String(++seq).padStart(12, '0')}`;
+  const sitePersona = opts?.persona ?? null;
+  const dryRunCalls: World['dryRunCalls'] = [];
   const items: World['items'] = new Map();
   const jobs: World['jobs'] = new Map();
   const templates: World['templates'] = new Map();
@@ -69,11 +72,15 @@ function makeWorld(role: string = 'reviewer'): World {
       const t = [...templates.values()].find((x) => x.site_id === siteId && x.key === key && x.version === version);
       return Promise.resolve(t ? { ...t } : null);
     },
-    invokeDryRun: () => Promise.resolve({
-      ok: true, output: { intro: 'dry' },
-      gates: [{ gate: 'schema', severity: 'fail', passed: true }],
-      tokens_in: 100, tokens_out: 200,
-    }),
+    getSitePersona: () => Promise.resolve(sitePersona),
+    invokeDryRun: (_siteId, _tpl, _input, _itemKey, persona) => {
+      dryRunCalls.push({ persona: persona ?? null });
+      return Promise.resolve({
+        ok: true, output: { intro: 'dry' },
+        gates: [{ gate: 'schema', severity: 'fail', passed: true }],
+        tokens_in: 100, tokens_out: 200,
+      });
+    },
     insertTemplate: (siteId, _userId, row) => {
       const id = uid();
       templates.set(id, {
@@ -272,7 +279,7 @@ function makeWorld(role: string = 'reviewer'): World {
     now: () => Date.now(),
   };
 
-  return { deps, items, jobs, templates, webhookCalls, generateCalls, metrics };
+  return { deps, items, jobs, templates, webhookCalls, generateCalls, metrics, dryRunCalls };
 }
 
 const call = (deps: AdminDeps, method: string, path: string, body?: unknown) =>
@@ -750,4 +757,18 @@ Deno.test('OPTIONS preflight returns 204 with CORS', async () => {
   }));
   assertEquals(res.status, 204);
   assert(res.headers.get('access-control-allow-origin'));
+});
+
+Deno.test('POST /templates/test threads the site persona into the dry-run (and null when unset)', async () => {
+  const withPersona = makeWorld('editor', { persona: 'DOCTRINE: vấn đề → giải pháp.' });
+  const res = await call(withPersona.deps, 'POST', '/templates/test', {
+    key: 'combo-so-chu-dao-su-menh', input_data: { x: 1 },
+  });
+  assertEquals(res.status, 200);
+  assertEquals(withPersona.dryRunCalls.length, 1);
+  assertEquals(withPersona.dryRunCalls[0].persona, 'DOCTRINE: vấn đề → giải pháp.');
+
+  const without = makeWorld('editor');
+  await call(without.deps, 'POST', '/templates/test', { key: 'combo-so-chu-dao-su-menh', input_data: { x: 1 } });
+  assertEquals(without.dryRunCalls[0].persona, null);
 });
