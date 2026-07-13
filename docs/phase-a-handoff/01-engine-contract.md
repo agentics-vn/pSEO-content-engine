@@ -29,9 +29,9 @@ strategy + demo pages   →   validate → load → jobs →  webhook → pull �
 
 | # | Deliverable | Acceptance |
 |---|---|---|
-| A1 | **Shared math/facts dependency.** If pages stand on computed values, the site imports `@pseo/numerology-core` (or the domain's shared package). **No local copy of the math** — a local fork WILL diverge from the engine (this happened: the site's `comboHarmony` kept an old heuristic and the flagship page's harmony badge would have silently flipped at integration). | grep finds no duplicated implementation |
+| A1 | **No local copy of the math.** If pages stand on computed values, render them from `row.facts` — the engine computes every deterministic value once and delivers it with each published row (§4). Do NOT re-implement or import the engine's math package (it is intentionally unpublished; a local fork WILL diverge — this happened: the site's `comboHarmony` kept an old heuristic and the flagship page's harmony badge would have silently flipped at integration). A runtime calculator for user input (e.g. `@csessh/sochumenh`) is fine — it's parity-guarded against the engine in CI. | grep finds no duplicated implementation; pages read `row.facts` |
 | A2 | **3–5 demo pages rendered from engine-shaped data**: hand-write sample rows in the exact published envelope (§4) into a `*.generated.json`-style file and render them through the real page component. These double as the future few-shots. | `npm run build` renders them; every schema field visibly used |
-| A3 | **Build-time safety gate** on the programmatic route: recompute the facts, throw on slug/data drift; scope declared by data (`getStaticPaths` over the content file). | hand-editing a number in the data file breaks the build |
+| A3 | **Build-time safety gate** on the programmatic route: structural throw — slug ↔ `facts` must agree and every declared page must be present; scope declared by data (`getStaticPaths` over the content file). No math re-run (A1). | hand-editing the data file so slug and facts disagree breaks the build |
 | A4 | **Hub & spoke in place**: hub page(s) for the head term linking down with keyword-rich anchors; spoke-to-spoke related links computed from data (never hardcoded hrefs). | hubs exist; related links can't 404 |
 | A5 | **On-page baseline**: `seoTitle` (≤~60 chars) distinct from the long H1, metaDescription, FAQPage JSON-LD from the `faqs` field, self-canonical, UTM-tagged CTA links, OG-card plan, sitemap includes the cluster. | present on the demo pages |
 
@@ -169,7 +169,11 @@ The literal `POST /jobs` body:
   "review_sample_pct": 100,           // golden set = 100; batches = 25
   "items": [
     { "item_key": "<slug>", "input_data": { /* every fact + every {token} the template/guards reference */ } }
-  ]
+  ],
+  // OPTIONAL demand ordering: item_key → search volume; the engine generates
+  // (and therefore reaches review) highest-priority first. Derive it from
+  // keywords.csv with scripts/keywords-to-worklist.mjs — never invent volumes.
+  "priorities": { "<slug>": 480 }
 }
 ```
 
@@ -201,6 +205,9 @@ bearer key) and receives:
     "template_key": "combo-so-chu-dao-su-menh",
     "template_version": 1,
     "output": { /* exactly output_schema; reviewer edits already merged */ },
+    "facts":  { /* the item's input_data: every engine-computed value the page
+                   stands on — numbers, harmony, and (combo axis) the
+                   internal-link data `hub` + `siblings` (§3) */ },
     "updated_at": "2026-07-11T09:00:00Z"
   }
 ]
@@ -208,15 +215,26 @@ bearer key) and receives:
 
 Your A2 demo file mirrors this envelope so the Phase C swap (hand-written →
 pulled) is a one-line loader change. Computed display values (harmony class,
-derived numbers) should be recomputed page-side from the shared package, not
-stored — that's what the drift throw checks.
+derived numbers, hub/sibling links) are rendered **from `row.facts`** — never
+recomputed site-side (A1). The page-level throw checks that `facts` and the
+slug agree structurally, not that re-run math matches.
+
+**Publish webhook (optional go-live signal).** Register with your site key —
+`POST /v1/sites/<slug>/webhooks {url}` (public https only). The response
+returns a **`webhook_secret` ONCE** plus a `verify` block. On every publish the
+engine POSTs `{site, template, template_version, item_key, item_count}` to the
+URL, HMAC-SHA256 signed over the exact raw body as
+`x-signature: sha256=<hex>`. Deploy-hook URLs can ignore the header; your own
+endpoint should verify it (constant-time compare — the integration kit ships a
+ready `scripts/verify-webhook.mjs`). Then re-pull; the payload tells you which
+item changed, so `?since=` incremental pulls work.
 
 ## 5. Known traps (each burned a real project)
 
 1. **Constraint notes are load-bearing** — never instruct the engine team to
    drop them; ~⅓ of items fail the schema gate without them.
 2. **`title` ≠ `seoTitle`** — the SERP truncates ~60 chars; author both.
-3. **Local math copies diverge** — depend on the shared package (A1).
+3. **Local math copies diverge** — render engine-computed values from `row.facts`, never re-run the math site-side (A1).
 4. **`numeric_consistency` on big numbers** — false positives; use formatted
    strings + `required_mentions` (§2.2).
 5. **Stamped openings** — if your example rows all start "«Entity X» hôm

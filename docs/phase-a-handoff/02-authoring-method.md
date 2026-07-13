@@ -61,7 +61,10 @@ Before any page shape is designed, draw the cluster:
 
 Encode it, don't hope for it:
 - Sideways/up links are **data**: put `related` slugs into `input_data` (the
-  work-list generator computes them), render them in the page component.
+  work-list generator computes them), render them in the page component. For
+  the built-in **combo axis the engine auto-injects `hub` + `siblings`** into
+  every item's input_data (arrives in `row.facts` — render, don't re-derive);
+  other verticals pass their own.
 - If the prose must reference the hub concept, enforce it with a
   `required_mentions` guard — the gate makes the strategy non-optional.
 - The hub page itself is usually hand-written (one page; highest stakes) and

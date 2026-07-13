@@ -11,20 +11,29 @@ so it is deliberately a local runbook.
 
 ## Already live on this project (no action needed)
 
-- **Schema** — migrations `0001`–`0005` applied. 8 tables, all RLS-enabled.
+- **Schema** — migrations `0001`–`0014` applied (tenancy/cache-key `0001`–`0005`,
+  master-admin `0007`, batch + channel tokens `0008`–`0010`, job status `0011`,
+  webhook secret `0012`, item priority `0013`, site persona `0014`).
 - **Security** — advisor clean. `prose_published` is `security_invoker`; the
   `add_job_usage` / `item_metrics_summary` RPCs are `service_role`-only; no
-  cross-tenant read path. (Only 3 intentional INFO notes remain.)
-- **`content-api`** edge function — deployed, `ACTIVE`, `verify_jwt=false`
-  (it authenticates with per-site API keys, not JWTs).
+  cross-tenant read path.
+- **All three edge functions** — deployed, `ACTIVE`. `content-api`
+  `verify_jwt=false` (per-site API keys), `prose-admin` `verify_jwt=false`
+  (own JWT + membership check), `prose-generate` `verify_jwt=true`.
+- **Auto-deploy** — merging to `main` deploys `prose-generate` + `prose-admin`
+  via `.github/workflows/deploy-functions.yml` (needs the
+  `SUPABASE_ACCESS_TOKEN` repo secret; correct `verify_jwt` flags baked in).
+- **Tenant #1 (`sochumenh`)** — loaded; golden set (5 pages) published and
+  pulled by the live site.
 
-## What's left (this runbook) — all local
+## This runbook now covers
 
-1. Deploy `prose-generate` + `prose-admin`.
-2. Set the one secret that isn't auto-injected: `ANTHROPIC_API_KEY`.
-3. Create your admin login and grant it site membership.
-4. Load tenant #1 (`sochumenh`) and mint its read key.
-5. Point the Admin UI at the project and smoke-test end to end.
+1. Standing up a FRESH environment (or re-running any step): CLI deploys,
+   secrets, admin login, seed load.
+2. Loading/updating tenants — including the site **persona**
+   (`seeds/<client>/persona.md`; load-seed prints a loud diff on change) and
+   demand `priorities` on jobs (`scripts/keywords-to-worklist.mjs`).
+3. Golden set → distill → batch flow, and the scheduled Routines.
 
 ---
 
@@ -257,6 +266,8 @@ Enable the two Routines once the engine is live and their env vars are set:
   them "on all three" is superseded — only `ANTHROPIC_API_KEY` is manual.
 - **Template versions are immutable.** To change a template, bump its version;
   `load-seed.ts` refuses to overwrite an existing `(key, version)`.
-- **Deploying from this repo's CI environment isn't possible** — outbound to
-  `*.supabase.co` is blocked by the agent egress policy, and the two secrets
-  shouldn't live there anyway. This runbook is intentionally local.
+- **Function deploys are automated**: merge to `main` and
+  `.github/workflows/deploy-functions.yml` deploys `prose-generate` +
+  `prose-admin` from GitHub's network (the agent sandbox itself remains
+  egress-blocked to `*.supabase.co`, which is why the workflow exists). The
+  local CLI path above stays as the manual fallback.

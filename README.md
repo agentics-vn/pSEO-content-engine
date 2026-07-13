@@ -18,16 +18,24 @@ supabase/
   migrations/0001_…sql       Tenancy + content pipeline. Locks the critical cache
                               key (site_id, template_key, version, item_key, hash).
   functions/
-    prose-generate/          The ONLY holder of the LLM API key. One item/call.
-                              Strict tool use + constraint-notes + gates.
-    prose-admin/             Templates, jobs, review, approve (fail-gate block),
-                              one-way publish.
-    content-api/             The only external surface: GET /published + webhook,
-                              site-scoped bearer keys, read-only.
+    prose-generate/          The ONLY holder of the LLM API key. Anthropic
+                              Message Batches by default (sync escape hatch),
+                              auto-retry on truncated/degenerate output,
+                              auto-sized max_tokens, prompt caching. Strict
+                              tool use + constraint-notes + gates. Prepends the
+                              site PERSONA (sites.persona) to every template's
+                              system_prompt.
+    prose-admin/             Templates, jobs (demand-priority ordering), review,
+                              approve (fail-gate block), one-way publish
+                              (HMAC-signed webhook ping).
+    content-api/             The only external surface: GET /published
+                              (output + engine-computed `facts`) + webhook
+                              registration, site-scoped bearer keys, read-only.
     _shared/gates/           GENERIC validation gates — all domain rules arrive as
                               data via each template's `guards` JSON.
-seeds/sochumenh/             Tenant #1: site record + the combo template
-                              (output_schema, guards, prompts) ready to load.
+seeds/sochumenh/             Tenant #1: site record, combo template, ROLLOUT plan,
+                              persona + v3 drafts awaiting site approval.
+docs/phase-a-handoff/        THE handoff package a site-repo session works from.
 ```
 
 ## Boundary (why this is a separate repo)
@@ -40,24 +48,24 @@ astro/Fly) without caring which.
 
 ## Status
 
-Code is complete and tested; the live engine project
-(`mafqvoahltslxwttmvkn`) is mid-rollout. See [`docs/DEPLOY.md`](docs/DEPLOY.md)
-for the go-live checklist.
+**Live.** The engine project (`mafqvoahltslxwttmvkn`) is deployed and serving:
+migrations `0001`–`0014` applied; all three edge functions ACTIVE; edge
+functions auto-deploy from `main` via `.github/workflows/deploy-functions.yml`.
+Tenant #1 (`sochumenh`) has its golden set (5 pages) **published and pulled by
+the live site**. See [`docs/DEPLOY.md`](docs/DEPLOY.md) for the runbook.
 
 | Piece | State |
 |---|---|
-| Tenancy + cache-key + performance migrations (`0001`–`0004`) | ✅ implemented · ✅ applied live |
-| Security lockdown (`0005` — `security_invoker` view, `service_role`-only RPCs) | ✅ implemented · ✅ applied live |
-| `@pseo/numerology-core` (vetted harmony matrix, unit + golden tests) | ✅ implemented |
-| Generic gate runner (per-item + `similarity`/`phrase_frequency` batch gates) | ✅ implemented |
-| `prose-generate` (strict tool use, constraint notes, cache, gates) | ✅ implemented · ⬜ deploy (local, `docs/DEPLOY.md`) |
-| `prose-admin` (templates, jobs, run-loop, approve-blocks-on-fail, publish) | ✅ implemented · ⬜ deploy (local, `docs/DEPLOY.md`) |
-| `content-api` (published + webhooks, site-scoped keys) | ✅ implemented · ✅ deployed live (`ACTIVE`) |
-| sochumenh seed + `scripts/load-seed.ts` | ✅ loadable · ⬜ load (needs service-role key) |
-| `ANTHROPIC_API_KEY` secret + admin login + golden set | ⬜ ops step (WP6) |
-| Central GSC collector + per-project performance ingestion | ✅ implemented |
-| Admin UI (`admin/` — dashboard, review queue, jobs) | ✅ implemented · Fly: `pseo-content-engine` |
-| Scheduled Routines (steward + GSC collector) | ⬜ enable after go-live |
+| Schema (tenancy, cache-key, security, batch, persona — `0001`–`0014`) | ✅ applied live |
+| `prose-generate` (batches, auto-retry, sizing, caching, persona, gates) | ✅ deployed (CI auto-deploy) |
+| `prose-admin` (templates, jobs + priorities, review, publish + signed webhook) | ✅ deployed (CI auto-deploy) |
+| `content-api` (published rows incl. `facts`, webhook registration + secret) | ✅ deployed |
+| Per-site persona layer (`persona.md` → every template's prompt) | ✅ live · sochumenh adoption pending (drafts in seed) |
+| sochumenh golden set | ✅ published (5 pages, live on the site) |
+| Central GSC collector + per-project performance ingestion | ✅ implemented · ⬜ Google-side setup (`docs/GSC-SETUP.md`) |
+| Admin UI (mobile-optimized; persona card, priorities, actual cost) | ✅ · Fly: `pseo-content-engine` |
+| Scheduled Routines (steward + GSC collector) | ⬜ enable after env/secrets config |
+| Full 144-combo run | ⬜ after persona + template v3 adoption (`seeds/sochumenh/ROLLOUT.md`) |
 
 ## Admin UI
 
@@ -92,7 +100,10 @@ deno check prose-generate/index.ts prose-admin/index.ts content-api/index.ts
 
 Functions resolve `@pseo/numerology-core` through `supabase/functions/deno.json`
 (import map → `packages/numerology-core/src`), keeping one math implementation
-for engine and sites. Deploy with `supabase functions deploy <name>`. The only
+engine-side (sites consume engine-computed `row.facts`, they don't import it).
+**Merging to `main` auto-deploys** `prose-generate` + `prose-admin` via
+`.github/workflows/deploy-functions.yml` (correct `verify_jwt` flags baked in);
+manual fallback: `supabase functions deploy <name>`. The only
 secret you set by hand is `ANTHROPIC_API_KEY` (on **prose-generate**, the one
 function that calls the model) — `SUPABASE_URL` / `SUPABASE_ANON_KEY` /
 `SUPABASE_SERVICE_ROLE_KEY` are auto-injected into every edge function and the
@@ -122,16 +133,19 @@ end-to-end smoke test) see [`docs/DEPLOY.md`](docs/DEPLOY.md).
 6. **Golden set:** generate ~15 combos on a Sonnet-class model spanning all three
    harmony classes + a master number; human-review to publish; distill approved
    outputs into `few_shots`; switch the template `model` to Haiku for the rest.
-7. **Wire sochudao** to pull from `content-api` at build time (replaces its static
-   `COMBO_CONTENT` import) and keep its compile-time drift throw; extend it to
-   throw if any declared grid combo is missing from the pull.
+7. **Wire the site** to pull from `content-api` at build time
+   (`consumers/sochudao/pull-combos.mjs` is the live reference): render prose
+   from `output` and deterministic values from engine-computed `facts` — no
+   site-side math — and throw if any declared grid combo is missing.
 
 ## Non-negotiables (learned the hard way — §7, §14)
 
 - **Approve refuses on a red fail-gate.** The block is on the approve step, not
   just on editing published items.
-- **Same `numerology-core` on both sides.** Engine and site must compute identical
-  values or every page throws at build. This package is the only implementation.
+- **One math implementation, engine-side.** Deterministic values are computed
+  once by the engine and delivered per row as `facts`; sites render them, never
+  recompute (runtime visitor calculators like `@csessh/sochumenh` are
+  parity-guarded in CI).
 - **Cache key includes `site_id` and `template_version`.** Without the former,
   two tenants naming a template alike collide; without the latter, a new
   prompt/model silently reuses stale output.
