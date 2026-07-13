@@ -25,6 +25,7 @@ export function JobsPage({
   const [jobMode, setJobMode] = useState<'generate' | 'regenerate'>('generate');
   const [useRaw, setUseRaw] = useState(false);
   const [itemsJson, setItemsJson] = useState('[{"item_key":"so-chu-dao-1-su-menh-1","input_data":{}}]');
+  const [prioritiesJson, setPrioritiesJson] = useState('');
   const [busy, setBusy] = useState(false);
 
   const templateOptions = useMemo(() => latestPerKey(templates), [templates]);
@@ -75,6 +76,17 @@ export function JobsPage({
         enumerate: 'combo-grid',
         filter: master === 'all' ? {} : { master: master === 'only' ? 'only' : 'exclude' },
       };
+      if (prioritiesJson.trim()) {
+        try {
+          const parsed = JSON.parse(prioritiesJson);
+          if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('not an object');
+          input = { ...input, priorities: parsed as Record<string, number> };
+        } catch {
+          notify('Invalid priorities JSON (expected { item_key: number })', true);
+          setBusy(false);
+          return;
+        }
+      }
     }
     const res = await source.createJob(input);
     if (res.ok) {
@@ -150,6 +162,21 @@ export function JobsPage({
                   {' · ~'}{Math.round(comboCount * samplePct / 100)} to review
                   {selectedTpl ? ` · using ${selectedTpl.key} v${selectedTpl.version} · ${selectedTpl.model}` : ''}
                 </p>
+                <details className="advanced">
+                  <summary>Search-demand priorities (optional)</summary>
+                  <p className="hint" style={{ marginTop: 8 }}>
+                    Higher = generated &amp; reviewed first. Paste the <code>priorities</code> map from
+                    {' '}<code>node scripts/keywords-to-worklist.mjs seeds/&lt;client&gt;/keywords.csv</code>.
+                    Combos you omit default to 0.
+                  </p>
+                  <textarea
+                    rows={4}
+                    className="code-input"
+                    placeholder={'{ "so-chu-dao-7-su-menh-3": 480, "so-chu-dao-1-su-menh-5": 90 }'}
+                    value={prioritiesJson}
+                    onChange={(e) => setPrioritiesJson(e.target.value)}
+                  />
+                </details>
               </div>
             ) : (
               <div className="full">

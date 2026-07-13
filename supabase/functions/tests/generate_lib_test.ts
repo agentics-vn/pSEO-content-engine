@@ -9,6 +9,7 @@ import {
   buildItemLlmRequest,
   bumpMaxTokens,
   coerceToSchema,
+  collectBatchJob,
   constraintNotes,
   estimateOutputTokens,
   fillTemplate,
@@ -18,10 +19,13 @@ import {
   isDegenerate,
   llmResultFromBatchMessage,
   sizedMaxTokens,
+  submitBatchJob,
   resolveGuards,
   reviewSampleHit,
   stripForStrict,
   validateSchema,
+  type AnthropicBatchApi,
+  type BatchDeps,
   type GenerateDeps,
   type ItemRow,
   type LlmResult,
@@ -369,4 +373,109 @@ Deno.test('finalizeItemFromLlm: batch channel sets usage_channel on save', async
   });
   assertEquals(item.status, 'generated');
   assertEquals((item as ItemRow & { usage_channel?: string }).usage_channel, 'batch');
+});
+
+// ── Anthropic Message Batches (submit / collect / P1 batch-aware retry) ───────
+
+async function makeBatchWorld(opts: {
+  batchId?: string | null;
+  status?: string;
+  results?: Array<{ custom_id: string; result: Record<string, unknown> }>;
+} = {}) {
+  const inputData = buildComboInput('so-chu-dao-7-su-menh-3') as unknown as Record<string, unknown>;
+  const item: ItemRow = {
+    id: 'item-b1', site_id: 'site-1', job_id: 'job-1',
+    template_key: seed.key, template_version: seed.version,
+    item_key: 'so-chu-dao-7-su-menh-3',
+    data_hash: await dataHash(inputData),
+    input_data: inputData, output: null, status: 'pending', validation: {}, regen_count: 0,
+  };
+  const template: TemplateRow = {
+    id: 'tpl-1', site_id: 'site-1', key: seed.key, version: seed.version,
+    system_prompt: seed.system_prompt, user_template: seed.user_template,
+    output_schema: seed.output_schema, few_shots: [], guards: seed.guards,
+    model: seed.model, temperature: seed.temperature, max_tokens: seed.max_tokens,
+  };
+  const job: Record<string, unknown> = {
+    id: 'job-1', mode: 'generate', anthropic_batch_id: opts.batchId ?? null, batch_status: null,
+  };
+  const calls = { create: 0, retry: [] as string[], failure: [] as string[], usage: [] as Array<[number, number, string?]> };
+  const batchApi: AnthropicBatchApi = {
+    create: (_reqs) => { calls.create++; return Promise.resolve({ id: 'batch-1' }); },
+    retrieve: (_id) => Promise.resolve({ processing_status: opts.status ?? 'ended', request_counts: { succeeded: 1 } }),
+    // deno-lint-ignore require-yield
+    results: async function* (_id) { for (const r of (opts.results ?? [])) yield r as never; },
+  };
+  const deps: BatchDeps = {
+    getItem: (id) => Promise.resolve(id === item.id ? { ...item } : null),
+    getTemplate: () => Promise.resolve(template),
+    saveResult: (_it, patch) => { Object.assign(item, patch); return Promise.resolve(); },
+    addJobUsage: (_j, tin, tout, ch) => { calls.usage.push([tin, tout, ch]); return Promise.resolve(); },
+    getJobReviewPct: () => Promise.resolve(0),
+    llm: () => Promise.reject(new Error('llm must not be called on the batch path')),
+    getJob: () => Promise.resolve(job as never),
+    listPendingItems: () => Promise.resolve(item.status === 'pending' ? [{ ...item }] : []),
+    countPending: () => Promise.resolve(item.status === 'pending' ? 1 : 0),
+    updateJobBatch: (_j, patch) => { Object.assign(job, patch); return Promise.resolve(); },
+    noteBatchFailure: (_it, err) => { calls.failure.push(err); return Promise.resolve(); },
+    noteBatchRetry: (it, detail) => {
+      const prev = Number((it.validation as { gen_retry?: unknown } | null)?.gen_retry ?? 0);
+      item.validation = { ...(item.validation ?? {}), gen_retry: prev + 1, retry_note: detail };
+      calls.retry.push(detail);
+      return Promise.resolve();
+    },
+  };
+  return { item, template, job, deps, batchApi, calls };
+}
+
+function batchResult(input: unknown, stopReason: string) {
+  return {
+    custom_id: 'item-b1',
+    result: {
+      type: 'succeeded',
+      message: {
+        content: [{ type: 'tool_use', name: 'emit_content', input }],
+        usage: { input_tokens: 1000, output_tokens: 900 },
+        stop_reason: stopReason,
+      },
+    },
+  };
+}
+
+Deno.test('submitBatchJob submits pending items and marks the job in batch channel', async () => {
+  const w = await makeBatchWorld({ batchId: null });
+  const res = await submitBatchJob(w.deps, w.batchApi, (r) => r, 'job-1');
+  assertEquals(res.ok, true);
+  assertEquals(res.request_count, 1);
+  assertEquals(res.batch_id, 'batch-1');
+  assertEquals(w.calls.create, 1);
+  assertEquals(w.job.anthropic_batch_id, 'batch-1');
+  assertEquals(w.job.run_channel, 'batch');
+});
+
+Deno.test('collectBatchJob finalizes a clean succeeded result', async () => {
+  const w = await makeBatchWorld({ batchId: 'batch-1', results: [batchResult(validItem(), 'end_turn')] });
+  const res = await collectBatchJob(w.deps, w.batchApi, 'job-1');
+  assertEquals(res.ok, true);
+  assertEquals(res.processed, 1);
+  assertEquals(w.item.status, 'generated');
+  assertEquals(w.calls.retry.length, 0);
+  assertEquals(w.job.anthropic_batch_id, null); // batch cleared after collect
+});
+
+Deno.test('P1 batch: a truncated succeeded result is re-queued once, then finalized', async () => {
+  // stop_reason=max_tokens with otherwise-valid content → truncated, not degenerate.
+  const w = await makeBatchWorld({ batchId: 'batch-1', results: [batchResult(validItem(), 'max_tokens')] });
+  await collectBatchJob(w.deps, w.batchApi, 'job-1');
+  // Not finalized: still pending, gen_retry bumped, wasted attempt billed to the job.
+  assertEquals(w.item.status, 'pending');
+  assertEquals((w.item.validation as { gen_retry?: number }).gen_retry, 1);
+  assertEquals(w.calls.retry.length, 1);
+  assert(w.calls.usage.some((u) => u[2] === 'batch'), 'wasted attempt billed on the batch channel');
+
+  // Re-submit sets a new batch id; second collect must NOT retry again (cap 1) → finalize.
+  w.job.anthropic_batch_id = 'batch-2';
+  await collectBatchJob(w.deps, w.batchApi, 'job-1');
+  assertEquals(w.calls.retry.length, 1);       // no second retry
+  assert(w.item.status !== 'pending', 'finalized on the capped retry');
 });
