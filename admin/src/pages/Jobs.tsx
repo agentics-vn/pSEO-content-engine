@@ -80,9 +80,12 @@ export function JobsPage({
         try {
           const parsed = JSON.parse(prioritiesJson);
           if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('not an object');
+          if (!Object.values(parsed).every((v) => typeof v === 'number' && Number.isFinite(v))) {
+            throw new Error('non-numeric value');
+          }
           input = { ...input, priorities: parsed as Record<string, number> };
         } catch {
-          notify('Invalid priorities JSON (expected { item_key: number })', true);
+          notify('Invalid priorities JSON — expected { "item_key": number }', true);
           setBusy(false);
           return;
         }
