@@ -44,8 +44,9 @@ seeds/<client>/
   persona.md              # OPTIONAL — site-level doctrine (see below)
   template.<key>.json     # §2 — the contract's core
   worklist.golden.json    # §3 — golden-set job body (or rely on a built-in enumerator)
-  # ── strategy COMPANIONS (travel with the drop for human review; engine never reads them) ──
+  # ── demand INPUT (drives generation & review order — see below) ──
   keywords.csv            # query,volume_mo,maps_to,source — REAL tool data, source named
+  # ── strategy COMPANION (travels for human review; engine never reads it) ──
   ROLLOUT.md              # phases by demand, sampling %, refresh cadence
 ```
 
@@ -72,11 +73,17 @@ construction. Rules:
 - Each item records the `persona_hash` it was generated under (in `validation`),
   so "which doctrine produced this page" stays answerable.
 
-Only the first three are read by the engine; `validate-seed` requires
+Only the files in the INGESTS block are read by the engine; `validate-seed` requires
 `site.json` + at least one `template.*.json` (a `worklist*.json` is checked when
-present). `keywords.csv` and `ROLLOUT.md` are the strategist's evidence and plan
-— produce them (they're how a human sanity-checks the axis), but their absence
-won't fail validation. Acceptance = this passes in the engine repo:
+present). `ROLLOUT.md` is the strategist's plan for humans. `keywords.csv` is
+more than evidence: it is the **demand input** — the operator runs
+`scripts/keywords-to-worklist.mjs` over it to produce the job's `priorities`
+map (§3), which sets generation/review order (`priority DESC`) and the rollout
+phases (P1/P2/tail, gated on index coverage). Semantics: `maps_to` = the page's
+`item_key`; multiple queries mapping to one page have their volumes summed;
+`source` names the tool + pull date (invented volumes = refuse, see below).
+Absence won't fail validation — but without it there is no demand-phased
+rollout. Acceptance = this passes in the engine repo:
 
 ```sh
 deno run --allow-read --config supabase/functions/deno.json \
@@ -101,12 +108,12 @@ review.
 | `key` | string | slug; template identity. Breaking shape change later = NEW key (§8 architecture) |
 | `version` | int | immutable once loaded; refresh = new version |
 | `name` | string | human label |
-| `model` | string | a REAL model id: `claude-sonnet-5` (golden) / `claude-haiku-4-5` (batch) are the defaults. Invented ids 404 at generation |
+| `model` | string | a REAL model id: `claude-sonnet-5` (golden) / `claude-haiku-4-5` (batch) are the defaults. Unknown ids are REJECTED at template creation |
 | `temperature` | number | sent only to models that accept sampling (haiku-4-5, sonnet-4.x); silently omitted for sonnet-5/opus-4.7+ families |
 | `max_tokens` | int | per-item output budget |
 | `output_schema` | JSON Schema | see §2.1 |
 | `guards` | object | see §2.2 — every key must reference real schema fields (validated) |
-| `system_prompt` | string | voice, persona, DO-NOTs, anti-stamp instruction ("vary openings"), facts-only rule |
+| `system_prompt` | string | TEMPLATE-SPECIFIC rules only (fact rules, anti-stamp "vary openings", facts-only rule) — site doctrine/voice lives in `persona.md` (§1), never duplicated here |
 | `user_template` | string | facts + `{constraint_notes}` ONLY — no voice. See §2.3 |
 | `few_shots` | array | `[{ "item_key": "...", "output": {…} }]` — start `[]`; distill ≤3 approved outputs later; the engine auto-excludes a few-shot matching the item being generated |
 

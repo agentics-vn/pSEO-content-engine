@@ -141,8 +141,10 @@ seeds/<client>/
                          # system_prompt at generation (voice, persuasion arc, guardrails)
   template.<key>.json    # output_schema + guards + prompts + model  (the core)
   worklist.golden.json   # the golden-set job body (8–15 items spanning the axis)
-  # strategy COMPANIONS (for human review; engine never reads them):
+  # demand INPUT — feeds the job's `priorities` (generation & review order,
+  # rollout phases; maps_to = item_key, volumes per page are summed):
   keywords.csv           # query,volume_mo,maps_to,source  — REAL tool data
+  # strategy COMPANION (for human review; engine never reads it):
   ROLLOUT.md             # phases by demand, sampling %, refresh cadence
 ```
 
