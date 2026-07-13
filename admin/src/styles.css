@@ -195,6 +195,7 @@ code { font-family: ui-monospace, Menlo, monospace; font-size: 0.92em; }
 .test-output { margin-top: 12px; }
 
 /* ── Jobs table ──────────────────────────────────────────────────────────── */
+.table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .data-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
 .data-table th, .data-table td { text-align: left; padding: 9px 8px; border-bottom: 1px solid var(--line); }
 .data-table th { color: var(--ink-2); font-weight: 600; font-size: 12px; }
@@ -280,4 +281,52 @@ code { font-family: ui-monospace, Menlo, monospace; font-size: 0.92em; }
     grid-template-columns: 1fr;
   }
   .frame { grid-template-columns: 64px 1fr; padding: 14px; }
+}
+
+/* ── Phone: sidebar rail → fixed bottom tab bar, single-column everything ──── */
+@media (max-width: 640px) {
+  .frame {
+    grid-template-columns: 1fr;
+    padding: 12px 12px 0;
+    gap: 12px;
+  }
+  .main { padding-bottom: 80px; }            /* clear the fixed bottom bar */
+
+  .side {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
+    flex-direction: row; align-items: center; gap: 8px;
+    height: 62px; padding: 0 14px;
+    background: var(--card);
+    border-top: 1px solid var(--line);
+    box-shadow: 0 -8px 24px -18px rgb(32 31 29 / 0.4);
+  }
+  .side .brand { display: none; }
+  .side .spacer { display: none; }
+  .nav, .nav.secondary {
+    flex-direction: row; background: transparent; box-shadow: none;
+    padding: 0; margin: 0; gap: 4px;
+  }
+  .nav:not(.secondary) { flex: 1; justify-content: space-around; }  /* spread the 4 tabs */
+  .nav-btn { width: 46px; height: 46px; }    /* comfortable tap targets */
+  .avatar { width: 34px; height: 34px; font-size: 13px; }
+
+  .stat-strip { grid-template-columns: 1fr 1fr; }  /* 2-up, not a long scroll */
+  .form-grid { grid-template-columns: 1fr; }
+  .card { padding: 16px; }
+  .hello h1 { font-size: 19px; }
+
+  /* ≥16px input text stops iOS from zooming the page on focus. */
+  input, select, textarea, .login input { font-size: 16px; }
+  .btn-dark, .btn-yellow, .btn-coral, .btn-ghost { padding: 11px 16px; }
+
+  /* Wrap instead of overflowing the viewport. */
+  .topbar, .section-head, .editor-head, .publish-toolbar,
+  .filter-row, .review-detail-head, .review-actions, .editor-actions { flex-wrap: wrap; }
+
+  /* Tables scroll inside their card, never the whole page. */
+  .data-table { min-width: 560px; }
+  .data-table th, .data-table td { white-space: nowrap; }
+
+  .review-items { max-height: 46vh; }        /* keep the detail reachable */
+  .toast { bottom: 80px; max-width: 92vw; }  /* above the bottom bar */
 }
