@@ -4,6 +4,7 @@ import { assert, assertEquals, assertMatch } from './_assert.ts';
 import {
   gateBannedPhrases,
   gateEntityConsistency,
+  gateKeywordDensity,
   gateLength,
   gateNumericConsistency,
   gateRequiredMentions,
@@ -82,6 +83,62 @@ Deno.test('gateLength bounds array elements via field.N (ngaylanhthangtot)', () 
   assertEquals(gateLength(baseCtx({ output: { phanTich: ['ok đây', 'quá dài đây rồi'] }, guards })).passed, false);
   // not an array (or missing index) → missing violation, not a crash
   assertEquals(gateLength(baseCtx({ output: { phanTich: 'chuỗi' }, guards })).passed, false);
+});
+
+Deno.test('gateRequiredMentions ci flag matches across Vietnamese casing; default stays case-sensitive', () => {
+  // "số chủ đạo 7" resolved from {searchKeyword} — seoTitle uses Title Case.
+  const output = { seoTitle: 'Số Chủ Đạo 7 Là Gì? Ý Nghĩa Nhà Tư Duy' };
+  const ciGuards = { required_mentions: { rules: [{ field: 'seoTitle', must_contain: ['số chủ đạo 7'], ci: true }] } };
+  assert(gateRequiredMentions(baseCtx({ output, guards: ciGuards })).passed);
+  // without ci the same rule fails — documents the case-sensitive default
+  const csGuards = { required_mentions: { rules: [{ field: 'seoTitle', must_contain: ['số chủ đạo 7'] }] } };
+  const cs = gateRequiredMentions(baseCtx({ output, guards: csGuards }));
+  assertEquals(cs.passed, false);
+  // ci still fails when the phrase is genuinely absent
+  const missing = gateRequiredMentions(baseCtx({ output: { seoTitle: 'Con Số 7 Trong Thần Số Học' }, guards: ciGuards }));
+  assertEquals(missing.passed, false);
+});
+
+Deno.test('gateKeywordDensity counts phrases case-insensitively and enforces min_count', () => {
+  const guards = { keyword_density: { keywords: ['số chủ đạo 7'], min_count: 2, fields: ['meaning', 'career'] } };
+  // 2 occurrences across the scanned fields (mixed casing, extra whitespace) → passes
+  const ok = gateKeywordDensity(baseCtx({ output: {
+    meaning: 'Số chủ đạo  7 mở ra một hành trình.',
+    career: 'Với số chủ đạo 7, môi trường nghiên cứu phù hợp.',
+    title: 'không được quét vì fields giới hạn',
+  }, guards }));
+  assert(ok.passed);
+  // only 1 occurrence → under-used
+  const under = gateKeywordDensity(baseCtx({ output: {
+    meaning: 'Số chủ đạo 7 mở ra một hành trình.',
+    career: 'Con số này hợp môi trường nghiên cứu.',
+  }, guards }));
+  assertEquals(under.passed, false);
+  assert(under.detail?.includes('min 2'));
+  assertEquals(under.severity, 'flag');
+});
+
+Deno.test('gateKeywordDensity trips stuffing over max_density and scans whole prose by default', () => {
+  // 3-word phrase ×3 in a 12-word text → density 9/12 = 75% > 10%
+  const stuffed = gateKeywordDensity(baseCtx({
+    output: { a: 'số chủ đạo 7 là số chủ đạo 7 của số chủ đạo 7', faqs: [{ q: 'x', a: 'y z' }] },
+    guards: { keyword_density: { keywords: ['số chủ đạo 7'], max_density: 0.1 } },
+  }));
+  assertEquals(stuffed.passed, false);
+  assert(stuffed.detail?.includes('density'));
+  // no fields config → nested strings (faq answers) count toward totalWords
+  // empty keywords → documented no-op
+  assert(gateKeywordDensity(baseCtx({ output: { a: 'bất kỳ' }, guards: { keyword_density: { keywords: [] } } })).passed);
+  // opt-in: absent from guards → runItemGates omits it entirely
+  const results = runItemGates(baseCtx({ output: { a: 'văn bản' }, guards: { unicode: {} } }));
+  assertEquals(results.find((r) => r.gate === 'keyword_density'), undefined);
+  // severity override via guards (tenant data)
+  const failSev = runItemGates(baseCtx({
+    output: { a: 'không có cụm nào' },
+    guards: { keyword_density: { severity: 'fail', keywords: ['số chủ đạo 7'], min_count: 1 } },
+  })).find((r) => r.gate === 'keyword_density')!;
+  assertEquals(failSev.severity, 'fail');
+  assertEquals(failSev.passed, false);
 });
 
 Deno.test('gateEntityConsistency flags invented entities, passes backed ones', () => {

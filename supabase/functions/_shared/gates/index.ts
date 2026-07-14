@@ -104,12 +104,21 @@ export function gateEntityConsistency(ctx: GateContext): GateResult {
            detail: invented.length ? `entities not backed by input_data: ${invented.join(', ')}` : undefined };
 }
 
+/** required_mentions: each rule's tokens must appear in the named field.
+ *  A rule may set `ci: true` for case-insensitive matching (NFC + lowercase) —
+ *  needed when the token is a keyword phrase that legitimately shifts case
+ *  between surfaces ("Số chủ đạo 7" in a title vs "Số Chủ Đạo 7" in a
+ *  seoTitle). Default stays case-sensitive (brand strings like "sochumenh"). */
 export function gateRequiredMentions(ctx: GateContext): GateResult {
   const rules = ctx.guards.required_mentions?.rules ?? [];
   const viol: string[] = [];
   for (const r of rules) {
-    const val = String(ctx.output[r.field] ?? '');
-    for (const token of r.must_contain) if (!val.includes(String(token))) viol.push(`${r.field}⊅"${token}"`);
+    const raw = String(ctx.output[r.field] ?? '');
+    const val = r.ci === true ? raw.normalize('NFC').toLowerCase() : raw;
+    for (const token of r.must_contain) {
+      const needle = r.ci === true ? String(token).normalize('NFC').toLowerCase() : String(token);
+      if (!val.includes(needle)) viol.push(`${r.field}⊅"${token}"`);
+    }
   }
   return { gate: 'required_mentions', severity: 'fail', passed: viol.length === 0,
            detail: viol.join('; ') || undefined };
@@ -134,6 +143,55 @@ export function gateNumericConsistency(ctx: GateContext): GateResult {
   const bad = [...new Set(nums)].filter(n => !allowed.has(n));
   return { gate: 'numeric_consistency', severity: 'fail', passed: bad.length === 0,
            detail: bad.length ? `unbacked numbers: ${bad.join(', ')}` : undefined };
+}
+
+/**
+ * keyword_density: on-page keyword enforcement over the prose body. Target
+ * phrases arrive as guards data with placeholders already resolved
+ * ({searchKeyword} or "số chủ đạo {n}" → the item's own demand phrase), so the
+ * gate stays domain-blind. Two directions share one severity (default 'flag' —
+ * SEO calibration is reviewer territory):
+ *   count < min_count      → under-used (page can't rank for its head term)
+ *   density > max_density  → stuffing (share of words the phrase occupies:
+ *                            count × phraseWords / totalWords)
+ * `fields` limits the scan (dotted paths OK, same resolution as the length
+ * gate); default = every string in the item. Matching is case-insensitive
+ * (NFC + lowercase + collapsed whitespace) — a keyword phrase legitimately
+ * shifts case across Vietnamese title/body surfaces. Missing/empty `keywords`
+ * is a documented no-op (mirrors note-only entity_consistency).
+ */
+export function gateKeywordDensity(ctx: GateContext): GateResult {
+  const cfg = ctx.guards.keyword_density ?? {};
+  const keywords: string[] = (Array.isArray(cfg.keywords) ? cfg.keywords : [])
+    .map(String).filter((k: string) => k.trim().length > 0);
+  if (keywords.length === 0) return { gate: 'keyword_density', severity: 'flag', passed: true };
+
+  const norm = (s: string) => s.normalize('NFC').toLowerCase().replace(/\s+/g, ' ').trim();
+  const scan = Array.isArray(cfg.fields) && cfg.fields.length
+    ? cfg.fields.map((f: unknown) => resolveLengthTarget(ctx.output, String(f)))
+        .filter((v: unknown): v is string => typeof v === 'string').join(' ')
+    : proseOf(ctx.output);
+  const hay = norm(scan);
+  const totalWords = hay === '' ? 0 : hay.split(' ').length;
+
+  const minCount: number = typeof cfg.min_count === 'number' ? cfg.min_count : 1;
+  const maxDensity: number | undefined = typeof cfg.max_density === 'number' ? cfg.max_density : undefined;
+
+  const viol: string[] = [];
+  for (const kw of keywords) {
+    const needle = norm(kw);
+    if (!needle) continue;
+    let count = 0; // non-overlapping occurrences
+    for (let i = hay.indexOf(needle); i !== -1; i = hay.indexOf(needle, i + needle.length)) count++;
+    const phraseWords = needle.split(' ').length;
+    const density = totalWords === 0 ? 0 : (count * phraseWords) / totalWords;
+    if (count < minCount) viol.push(`"${kw}" ×${count} < min ${minCount}`);
+    else if (maxDensity !== undefined && density > maxDensity) {
+      viol.push(`"${kw}" ×${count} density ${(density * 100).toFixed(1)}% > ${(maxDensity * 100).toFixed(1)}%`);
+    }
+  }
+  return { gate: 'keyword_density', severity: 'flag', passed: viol.length === 0,
+           detail: viol.join('; ') || undefined };
 }
 
 // ── Batch-scope gates (run after a batch, before publish) ────────────────────
@@ -318,7 +376,7 @@ export function runBatchGates(
   return out;
 }
 
-const PER_ITEM = [gateUnicode, gateLength, gateRequiredMentions, gateBannedPhrases, gateNumericConsistency, gateEntityConsistency];
+const PER_ITEM = [gateUnicode, gateLength, gateRequiredMentions, gateBannedPhrases, gateNumericConsistency, gateEntityConsistency, gateKeywordDensity];
 
 /** Run all configured per-item gates. Schema/faq_shape are checked upstream by
  *  strict tool use + a shape assert; those results should be merged in.
