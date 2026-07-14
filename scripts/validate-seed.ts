@@ -81,6 +81,13 @@ for await (const f of Deno.readDir(seedDir)) {
     if (typeof t.user_template === 'string' && !t.user_template.includes('{constraint_notes}')) {
       warn(`${where}: user_template has no {constraint_notes} — notes will be appended at the end instead`);
     }
+    // {tokens} resolve ONLY in user_template + guard configs. The system_prompt
+    // is the CACHED STATIC PREFIX (byte-identical per template, by design) and
+    // is never filled — a token here ships to the model literally.
+    if (typeof t.system_prompt === 'string') {
+      const tok = t.system_prompt.match(/\{[a-zA-Z_][\w.]*\}/);
+      if (tok) err(`${where}: system_prompt contains ${tok[0]} — placeholders do NOT resolve in system_prompt (it is the cached static prefix); move the token to user_template or reword`);
+    }
     // Guards must reference real schema fields. A length key may be
     // "field.N" to bound element N of an array-of-strings field.
     for (const field of Object.keys(t.guards?.length?.fields ?? {})) {
@@ -165,7 +172,11 @@ for (const { name, body } of worklists) {
     seen.add(it.item_key);
     if (!it.input_data || typeof it.input_data !== 'object') err(`${name}: ${it.item_key}: input_data must be an object`);
   }
-  for (const it of items.slice(0, 3)) {
+  // Dry-run EVERY item on small work-lists (a golden set's edge items — e.g.
+  // master numbers at the end — are exactly the ones that break); sample the
+  // head on big ones.
+  const toDryRun = items.length <= 20 ? items : items.slice(0, 3);
+  for (const it of toDryRun) {
     if (it.input_data && typeof it.input_data === 'object') dryRun(template, it.input_data, `${name}:${it.item_key}`);
   }
 }

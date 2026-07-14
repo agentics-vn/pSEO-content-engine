@@ -1,28 +1,70 @@
 {
   "key": "combo-so-chu-dao-su-menh",
-  "version": 2,
-  "name": "Tổ hợp Số chủ đạo × Số sứ mệnh",
+  "version": 3,
+  "name": "Tổ hợp Số chủ đạo × Số sứ mệnh (persona + persuasion arc)",
   "model": "claude-sonnet-5",
   "temperature": 0.7,
-  "max_tokens": 4500,
-  "_model_note": "Golden set (~15 items) generated on claude-sonnet-5 first, then distilled: promote approved outputs into few_shots and switch this field to claude-haiku-4-5 for the remaining batch. NOTE: temperature is ignored for model families that reject sampling params (sonnet-5/opus-4.7+/fable); it applies on haiku-4-5.",
-
+  "max_tokens": 5200,
+  "_model_note": "Golden on sonnet-5, then distill few_shots and flip to claude-haiku-4-5 for the batch (temperature applies on haiku only).",
   "output_schema": {
     "type": "object",
     "additionalProperties": false,
-    "required": ["title", "seoTitle", "tagline", "metaDescription", "intro", "synergy", "tension", "linkingInsight", "career", "love", "advice", "faqs"],
+    "required": [
+      "title",
+      "seoTitle",
+      "tagline",
+      "metaDescription",
+      "intro",
+      "synergy",
+      "tension",
+      "linkingInsight",
+      "career",
+      "love",
+      "advice",
+      "bridge",
+      "cta",
+      "faqs"
+    ],
     "properties": {
-      "title":           { "type": "string" },
-      "seoTitle":        { "type": "string" },
-      "tagline":         { "type": "string" },
-      "metaDescription": { "type": "string" },
-      "intro":           { "type": "string" },
-      "synergy":         { "type": "string" },
-      "tension":         { "type": "string" },
-      "linkingInsight":  { "type": "string" },
-      "career":          { "type": "string" },
-      "love":            { "type": "string" },
-      "advice":          { "type": "string" },
+      "title": {
+        "type": "string"
+      },
+      "seoTitle": {
+        "type": "string"
+      },
+      "tagline": {
+        "type": "string"
+      },
+      "metaDescription": {
+        "type": "string"
+      },
+      "intro": {
+        "type": "string"
+      },
+      "synergy": {
+        "type": "string"
+      },
+      "tension": {
+        "type": "string"
+      },
+      "linkingInsight": {
+        "type": "string"
+      },
+      "career": {
+        "type": "string"
+      },
+      "love": {
+        "type": "string"
+      },
+      "advice": {
+        "type": "string"
+      },
+      "bridge": {
+        "type": "string"
+      },
+      "cta": {
+        "type": "string"
+      },
       "faqs": {
         "type": "array",
         "minItems": 4,
@@ -30,44 +72,136 @@
         "items": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["q", "a"],
-          "properties": { "q": { "type": "string" }, "a": { "type": "string" } }
+          "required": [
+            "q",
+            "a"
+          ],
+          "properties": {
+            "q": {
+              "type": "string"
+            },
+            "a": {
+              "type": "string"
+            }
+          }
         }
       }
     }
   },
-
   "guards": {
-    "schema":            { "severity": "fail" },
-    "unicode":           { "severity": "fail", "form": "NFC" },
+    "schema": {
+      "severity": "fail"
+    },
+    "unicode": {
+      "severity": "fail",
+      "form": "NFC"
+    },
     "length": {
       "severity": "fail",
       "fields": {
-        "title":           [25, 70],
-        "seoTitle":        [30, 65],
-        "tagline":         [40, 90],
-        "metaDescription": [120, 165],
-        "intro":           [400, 750],
-        "synergy":         [350, 650],
-        "tension":         [350, 650],
-        "linkingInsight":  [300, 600],
-        "career":          [300, 650],
-        "love":            [300, 650],
-        "advice":          [300, 600]
+        "title": [
+          25,
+          70
+        ],
+        "seoTitle": [
+          30,
+          65
+        ],
+        "tagline": [
+          40,
+          90
+        ],
+        "metaDescription": [
+          120,
+          165
+        ],
+        "intro": [
+          400,
+          750
+        ],
+        "synergy": [
+          350,
+          650
+        ],
+        "tension": [
+          350,
+          650
+        ],
+        "linkingInsight": [
+          300,
+          600
+        ],
+        "career": [
+          300,
+          650
+        ],
+        "love": [
+          300,
+          650
+        ],
+        "advice": [
+          300,
+          600
+        ],
+        "bridge": [
+          200,
+          450
+        ],
+        "cta": [
+          80,
+          220
+        ]
       }
     },
     "required_mentions": {
       "severity": "fail",
       "rules": [
-        { "field": "title",           "must_contain": ["{lifePath}", "{destiny}"] },
-        { "field": "seoTitle",        "must_contain": ["{lifePath}", "{destiny}"] },
-        { "field": "metaDescription", "must_contain": ["{lifePath}", "{destiny}"] },
-        { "field": "linkingInsight",  "must_contain": ["{linking}"] }
+        {
+          "field": "title",
+          "must_contain": [
+            "{lifePath}",
+            "{destiny}"
+          ]
+        },
+        {
+          "field": "seoTitle",
+          "must_contain": [
+            "{lifePath}",
+            "{destiny}"
+          ]
+        },
+        {
+          "field": "metaDescription",
+          "must_contain": [
+            "{lifePath}",
+            "{destiny}"
+          ]
+        },
+        {
+          "field": "linkingInsight",
+          "must_contain": [
+            "{linking}"
+          ]
+        },
+        {
+          "field": "cta",
+          "must_contain": [
+            "sochumenh"
+          ]
+        }
       ]
     },
     "numeric_consistency": {
       "severity": "fail",
-      "computed": ["lifePath", "destiny", "linking", "maturity", "lpReduced", "dtReduced", "maturitySum"]
+      "computed": [
+        "lifePath",
+        "destiny",
+        "linking",
+        "maturity",
+        "lpReduced",
+        "dtReduced",
+        "maturitySum"
+      ]
     },
     "entity_consistency": {
       "severity": "flag",
@@ -75,21 +209,38 @@
     },
     "banned_phrases": {
       "severity": "fail",
-      "list": ["chắc chắn giàu", "chắc chắn thành công", "đảm bảo", "chữa khỏi", "đổi tên đổi vận", "100%", "tuyệt đối sẽ"]
+      "list": [
+        "chắc chắn giàu",
+        "chắc chắn thành công",
+        "đảm bảo",
+        "chữa khỏi",
+        "đổi tên đổi vận",
+        "100%",
+        "tuyệt đối sẽ"
+      ]
     },
     "faq_shape": {
       "severity": "fail",
       "count": 4,
-      "answers_must_contain": ["{linking}", "{maturity}"],
+      "answers_must_contain": [
+        "{linking}",
+        "{maturity}"
+      ],
       "note": "exactly 4 faqs; one answer must contain {linking}; one must contain {maturity}"
     },
-    "phrase_frequency": { "severity": "flag", "scope": "batch" },
-    "similarity":       { "severity": "flag", "scope": "batch", "method": "ngram_tfidf_cosine", "max_pairwise": 0.55 }
+    "phrase_frequency": {
+      "severity": "flag",
+      "scope": "batch"
+    },
+    "similarity": {
+      "severity": "flag",
+      "scope": "batch",
+      "method": "ngram_tfidf_cosine",
+      "max_pairwise": 0.55
+    }
   },
-
-  "system_prompt": "Bạn là chuyên gia thần số học viết nội dung cho sochumenh.vn. Nhiệm vụ: viết bài diễn giải tổ hợp \"Số chủ đạo × Số sứ mệnh\" bằng tiếng Việt tự nhiên, ấm áp, có chiều sâu — KHÔNG sáo rỗng, KHÔNG liệt kê gạch đầu dòng trong prose.\n\nNGUYÊN TẮC BẮT BUỘC:\n- Chỉ viết dựa trên DỮ KIỆN được cung cấp (chỉ số tính sẵn + đặc điểm hai con số). Không bịa đặc điểm của con số khác; đặc điểm của số chủ đạo phải đúng với số chủ đạo, của số sứ mệnh phải đúng với số sứ mệnh.\n- Mọi con số nêu trong bài (chỉ số liên kết, số trưởng thành, phép tính) phải KHỚP TUYỆT ĐỐI với dữ kiện. Không tự tính lại sai.\n- Với chỉ số liên kết, dùng phép trừ trị tuyệt đối trên CHỮ SỐ ĐÃ RÚT GỌN (ví dụ số 11 rút thành 2). Với số trưởng thành, dùng phép cộng rồi rút gọn, giữ nguyên số bậc thầy 11/22/33 nếu có.\n- ĐIỀU CẤM: không hứa hẹn tuyệt đối (\"chắc chắn giàu\", \"chắc chắn thành công\"), không lời khuyên y tế/tài chính/pháp lý, không tuyên bố mê tín cực đoan (\"đổi tên để đổi vận\"), không kỳ thị. Đây là nội dung tham khảo, gợi mở.\n- Mở bài và mở đầu MỖI ĐOẠN phải đa dạng giữa các tổ hợp. TUYỆT ĐỐI KHÔNG mở bài bằng các khuôn lặp: \"Người mang số chủ đạo X và số sứ mệnh Y...\", \"Có những người vừa...\", \"Có một sự thật...\". KHÔNG mở đầu đoạn sự nghiệp bằng \"Trong công việc,...\". Mỗi tổ hợp phải có câu mở khác hẳn nhau về cả cấu trúc lẫn từ ngữ; nếu thấy mình sắp viết một câu mở giống bài khác, hãy đổi hoàn toàn cách vào.\n- Giọng văn: như một người cố vấn hiểu bạn, không phán xét, không thần thánh hoá.",
-
-  "user_template": "Viết bài diễn giải cho tổ hợp:\n- Số chủ đạo (đường đời): {lifePath} — {lp.archetype}, {lp.keyword}\n    Bản chất: {lp.essence}\n    Ở vị trí đường đời: {lp.lifePathFraming}\n    Điểm mạnh: {lp.strengths}   Thách thức: {lp.challenges}\n- Số sứ mệnh (biểu đạt): {destiny} — {dt.archetype}, {dt.keyword}\n    Bản chất: {dt.essence}\n    Ở vị trí sứ mệnh: {dt.destinyFraming}\n    Điểm mạnh: {dt.strengths}   Thách thức: {dt.challenges}\n\nCHỈ SỐ TÍNH SẴN (phải dùng đúng, không tính lại sai):\n- Chỉ số liên kết = |{lpReduced} − {dtReduced}| = {linking}\n- Số trưởng thành = {lifePath} + {destiny} → {maturity}\n- Mức tương tác giữa hai chỉ số: {harmony}\n\nViết theo đúng schema: title (H1 chứa cụm từ khoá đầu, ví dụ \"Số chủ đạo {lifePath} và số sứ mệnh {destiny}\"), seoTitle (thẻ <title> ngắn cho SERP, KHÁC title), tagline, metaDescription, intro, synergy, tension, linkingInsight, career, love, advice, và 4 FAQ. Trong đó BẮT BUỘC có:\n- 1 FAQ nêu đúng chỉ số liên kết = {linking}\n- 1 FAQ nêu đúng số trưởng thành = {maturity}\n{constraint_notes}",
-
-  "few_shots_note": "v2: max 3, drawn from DIFFERENT harmony classes and — critically — with DISTINCT opening styles. Do NOT distill the raw v1 golden outputs as-is: they stamp their openers (5/5 career 'Trong công việc,', 4/5 intro 'Có những người vừa…'), so using them as few-shots would teach the stamp. Pick/edit approved outputs whose intro AND career open differently. Never include a few-shot for the combo being generated."
+  "system_prompt": "Nhiệm vụ: viết bài diễn giải tổ hợp \"Số chủ đạo × Số sứ mệnh\" bằng tiếng Việt tự nhiên — KHÔNG liệt kê gạch đầu dòng trong prose.\n\nLUẬT RIÊNG CỦA TEMPLATE NÀY (doctrine cấp site nằm ở tầng persona, không lặp lại ở đây):\n- Chỉ viết dựa trên DỮ KIỆN được cung cấp (chỉ số tính sẵn + đặc điểm hai con số). Không bịa đặc điểm của con số khác; đặc điểm của số chủ đạo phải đúng với số chủ đạo, của số sứ mệnh phải đúng với số sứ mệnh.\n- Mọi con số nêu trong bài (chỉ số liên kết, số trưởng thành, phép tính) phải KHỚP TUYỆT ĐỐI với dữ kiện. Không tự tính lại sai.\n- Với chỉ số liên kết, dùng phép trừ trị tuyệt đối trên CHỮ SỐ ĐÃ RÚT GỌN (ví dụ số 11 rút thành 2). Với số trưởng thành, dùng phép cộng rồi rút gọn, giữ nguyên số bậc thầy 11/22/33 nếu có.\n- Mở bài và mở đầu MỖI ĐOẠN phải đa dạng giữa các tổ hợp. TUYỆT ĐỐI KHÔNG mở bài bằng các khuôn lặp: \"Người mang số chủ đạo X và số sứ mệnh Y...\", \"Có những người vừa...\", \"Có một sự thật...\". KHÔNG mở đầu đoạn sự nghiệp bằng \"Trong công việc,...\". Mỗi tổ hợp phải có câu mở khác hẳn nhau về cả cấu trúc lẫn từ ngữ.\n- Trường `bridge`: nối ĐÚNG điểm giằng co của tổ hợp này với việc tra cứu bản đồ số đầy đủ — cụ thể theo dữ kiện trang, không chung chung. Trường `cta`: đúng MỘT hành động tiếp theo trên sochumenh.vn, giọng chỉ đường chứ không rao bán.",
+  "user_template": "Viết bài diễn giải cho tổ hợp:\n- Số chủ đạo (đường đời): {lifePath} — {lp.archetype}, {lp.keyword}\n    Bản chất: {lp.essence}\n    Ở vị trí đường đời: {lp.lifePathFraming}\n    Điểm mạnh: {lp.strengths}   Thách thức: {lp.challenges}\n- Số sứ mệnh (biểu đạt): {destiny} — {dt.archetype}, {dt.keyword}\n    Bản chất: {dt.essence}\n    Ở vị trí sứ mệnh: {dt.destinyFraming}\n    Điểm mạnh: {dt.strengths}   Thách thức: {dt.challenges}\n\nCHỈ SỐ TÍNH SẴN (phải dùng đúng, không tính lại sai):\n- Chỉ số liên kết = |{lpReduced} − {dtReduced}| = {linking}\n- Số trưởng thành = {lifePath} + {destiny} → {maturity}\n- Mức tương tác giữa hai chỉ số: {harmony}\n\nViết theo đúng schema: title (H1 chứa cụm từ khoá đầu, ví dụ \"Số chủ đạo {lifePath} và số sứ mệnh {destiny}\"), seoTitle (thẻ <title> ngắn cho SERP, KHÁC title), tagline, metaDescription, intro, synergy, tension, linkingInsight, career, love, advice, bridge (từ điểm giằng co của tổ hợp này → vì sao bản đồ số đầy đủ trên sochumenh.vn giải đáp trọn vẹn), cta (một hành động tiếp theo cụ thể, nhắc tên sochumenh), và 4 FAQ. Trong đó BẮT BUỘC có:\n- 1 FAQ nêu đúng chỉ số liên kết = {linking}\n- 1 FAQ nêu đúng số trưởng thành = {maturity}\n{constraint_notes}",
+  "few_shots": [],
+  "few_shots_note": "Reset for v3: distill ≤3 from v3 golden outputs approved under the persona (different harmony classes, DISTINCT opening styles, strong bridge/cta). Do NOT reuse v1/v2 outputs — they exemplify the pre-persona voice and have no bridge/cta."
 }
