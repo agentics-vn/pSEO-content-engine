@@ -33,8 +33,15 @@ if (!args.from || !/^\d{4}-\d{2}-\d{2}$/.test(String(args.from))) {
 const days = Number(args.days ?? 31);
 const out = String(args.out ?? 'seeds/ngaylanhthangtot/worklist.golden.ngay-tot-xau.json');
 const baseUrl = String(args['base-url'] ?? DEFAULT_BASE_URL);
-const HUB = 'ngay-tot-xau'; // hub slug — PROVISIONAL, confirm against site IA
-const SIBLING_SPAN = 3; //     link ±3 adjacent days (calendar prev/next cluster)
+const HUB = 'lich-am'; //   the head hub per seo-page-structure-spec §2.2 (/lich-am)
+const SIBLING_SPAN = 3; //  link ±3 adjacent days (calendar prev/next cluster)
+
+// item_key mirrors the site's URL shape /lich-am/ngay-{dd}-{mm}-{yyyy}/ 1:1
+// (seo spec §2.2) so the pull script never translates identifiers.
+const keyOf = (iso) => {
+  const [y, m, d] = iso.split('-');
+  return `ngay-${d}-${m}-${y}`;
+};
 
 const dates = Array.from({ length: days }, (_, i) => {
   const d = new Date(`${args.from}T00:00:00Z`);
@@ -51,8 +58,8 @@ for (const [i, date] of dates.entries()) {
   // scale past the golden month (365-day rollout).
   const siblings = dates
     .filter((_, j) => j !== i && Math.abs(j - i) <= SIBLING_SPAN)
-    .map((d) => `ngay-${d}`);
-  items.push({ item_key: `ngay-${date}`, input_data: { ...facts, hub: HUB, siblings } });
+    .map(keyOf);
+  items.push({ item_key: keyOf(date), input_data: { ...facts, hub: HUB, siblings } });
   process.stdout.write(`\r${i + 1}/${dates.length} ${date} (${facts.hoangDaoLabel}, ${facts.grade})   `);
   // 300 req/min per-IP budget on the hosted API — stay far under it.
   if (i < dates.length - 1) await new Promise((r) => setTimeout(r, 250));

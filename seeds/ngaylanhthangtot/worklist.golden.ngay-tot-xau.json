@@ -3,12 +3,15 @@
   "review_sample_pct": 100,
   "items": [
     {
-      "item_key": "ngay-2026-08-01",
+      "item_key": "ngay-01-08-2026",
       "input_data": {
         "date": "2026-08-01",
         "dateVi": "1 tháng 8 năm 2026",
+        "dateSlash": "01/08/2026",
+        "dateShort": "1/8",
+        "titleVariant": "B",
         "dowVi": "Thứ Bảy",
-        "searchPhraseDate": "ngày 1 tháng 8",
+        "searchPhraseDate": "ngày 01/08/2026",
         "lunarLabel": "Ngày 19 tháng Sáu năm Bính Ngọ",
         "canChiDay": "Đinh Mùi",
         "hoangDao": false,
@@ -44,21 +47,24 @@
           "Can chi · lá số: Nạp Âm ngày hành Thủy cộng 15 điểm — đánh giá theo lịch chung, chưa cá nhân hoá lá số.",
           "Giờ vàng: Phần giờ vàng không đổi điểm — đánh giá khung giờ tốt theo lịch chung. Giờ đáng chú ý: Dần (03:00–05:00)."
         ],
-        "hub": "ngay-tot-xau",
+        "hub": "lich-am",
         "siblings": [
-          "ngay-2026-08-02",
-          "ngay-2026-08-03",
-          "ngay-2026-08-04"
+          "ngay-02-08-2026",
+          "ngay-03-08-2026",
+          "ngay-04-08-2026"
         ]
       }
     },
     {
-      "item_key": "ngay-2026-08-02",
+      "item_key": "ngay-02-08-2026",
       "input_data": {
         "date": "2026-08-02",
         "dateVi": "2 tháng 8 năm 2026",
+        "dateSlash": "02/08/2026",
+        "dateShort": "2/8",
+        "titleVariant": "A",
         "dowVi": "Chủ Nhật",
-        "searchPhraseDate": "ngày 2 tháng 8",
+        "searchPhraseDate": "ngày 02/08/2026",
         "lunarLabel": "Ngày 20 tháng Sáu năm Bính Ngọ",
         "canChiDay": "Mậu Thân",
         "hoangDao": true,
@@ -94,22 +100,25 @@
           "Can chi · lá số: Nạp Âm ngày hành Thổ cộng 15 điểm — đánh giá theo lịch chung, chưa cá nhân hoá lá số.",
           "Giờ vàng: Phần giờ vàng không đổi điểm — đánh giá khung giờ tốt theo lịch chung. Giờ đáng chú ý: Tý (23:00–01:00)."
         ],
-        "hub": "ngay-tot-xau",
+        "hub": "lich-am",
         "siblings": [
-          "ngay-2026-08-01",
-          "ngay-2026-08-03",
-          "ngay-2026-08-04",
-          "ngay-2026-08-05"
+          "ngay-01-08-2026",
+          "ngay-03-08-2026",
+          "ngay-04-08-2026",
+          "ngay-05-08-2026"
         ]
       }
     },
     {
-      "item_key": "ngay-2026-08-03",
+      "item_key": "ngay-03-08-2026",
       "input_data": {
         "date": "2026-08-03",
         "dateVi": "3 tháng 8 năm 2026",
+        "dateSlash": "03/08/2026",
+        "dateShort": "3/8",
+        "titleVariant": "B",
         "dowVi": "Thứ Hai",
-        "searchPhraseDate": "ngày 3 tháng 8",
+        "searchPhraseDate": "ngày 03/08/2026",
         "lunarLabel": "Ngày 21 tháng Sáu năm Bính Ngọ",
         "canChiDay": "Kỷ Dậu",
         "hoangDao": false,
@@ -145,23 +154,26 @@
           "Can chi · lá số: Nạp Âm ngày hành Thổ cộng 15 điểm — đánh giá theo lịch chung, chưa cá nhân hoá lá số.",
           "Giờ vàng: Phần giờ vàng không đổi điểm — đánh giá khung giờ tốt theo lịch chung. Giờ đáng chú ý: Dần (03:00–05:00)."
         ],
-        "hub": "ngay-tot-xau",
+        "hub": "lich-am",
         "siblings": [
-          "ngay-2026-08-01",
-          "ngay-2026-08-02",
-          "ngay-2026-08-04",
-          "ngay-2026-08-05",
-          "ngay-2026-08-06"
+          "ngay-01-08-2026",
+          "ngay-02-08-2026",
+          "ngay-04-08-2026",
+          "ngay-05-08-2026",
+          "ngay-06-08-2026"
         ]
       }
     },
     {
-      "item_key": "ngay-2026-08-04",
+      "item_key": "ngay-04-08-2026",
       "input_data": {
         "date": "2026-08-04",
         "dateVi": "4 tháng 8 năm 2026",
+        "dateSlash": "04/08/2026",
+        "dateShort": "4/8",
+        "titleVariant": "A",
         "dowVi": "Thứ Ba",
-        "searchPhraseDate": "ngày 4 tháng 8",
+        "searchPhraseDate": "ngày 04/08/2026",
         "lunarLabel": "Ngày 22 tháng Sáu năm Bính Ngọ",
         "canChiDay": "Canh Tuất",
         "hoangDao": true,
@@ -197,24 +209,27 @@
           "Can chi · lá số: Nạp Âm ngày hành Kim cộng 15 điểm — đánh giá theo lịch chung, chưa cá nhân hoá lá số.",
           "Giờ vàng: Phần giờ vàng không đổi điểm — đánh giá khung giờ tốt theo lịch chung. Giờ đáng chú ý: Tý (23:00–01:00)."
         ],
-        "hub": "ngay-tot-xau",
+        "hub": "lich-am",
         "siblings": [
-          "ngay-2026-08-01",
-          "ngay-2026-08-02",
-          "ngay-2026-08-03",
-          "ngay-2026-08-05",
-          "ngay-2026-08-06",
-          "ngay-2026-08-07"
+          "ngay-01-08-2026",
+          "ngay-02-08-2026",
+          "ngay-03-08-2026",
+          "ngay-05-08-2026",
+          "ngay-06-08-2026",
+          "ngay-07-08-2026"
         ]
       }
     },
     {
-      "item_key": "ngay-2026-08-05",
+      "item_key": "ngay-05-08-2026",
       "input_data": {
         "date": "2026-08-05",
         "dateVi": "5 tháng 8 năm 2026",
+        "dateSlash": "05/08/2026",
+        "dateShort": "5/8",
+        "titleVariant": "B",
         "dowVi": "Thứ Tư",
-        "searchPhraseDate": "ngày 5 tháng 8",
+        "searchPhraseDate": "ngày 05/08/2026",
         "lunarLabel": "Ngày 23 tháng Sáu năm Bính Ngọ",
         "canChiDay": "Tân Hợi",
         "hoangDao": true,
@@ -250,24 +265,27 @@
           "Can chi · lá số: Nạp Âm ngày hành Kim cộng 15 điểm — đánh giá theo lịch chung, chưa cá nhân hoá lá số.",
           "Giờ vàng: Phần giờ vàng không đổi điểm — đánh giá khung giờ tốt theo lịch chung. Giờ đáng chú ý: Dần (03:00–05:00)."
         ],
-        "hub": "ngay-tot-xau",
+        "hub": "lich-am",
         "siblings": [
-          "ngay-2026-08-02",
-          "ngay-2026-08-03",
-          "ngay-2026-08-04",
-          "ngay-2026-08-06",
-          "ngay-2026-08-07",
-          "ngay-2026-08-08"
+          "ngay-02-08-2026",
+          "ngay-03-08-2026",
+          "ngay-04-08-2026",
+          "ngay-06-08-2026",
+          "ngay-07-08-2026",
+          "ngay-08-08-2026"
         ]
       }
     },
     {
-      "item_key": "ngay-2026-08-06",
+      "item_key": "ngay-06-08-2026",
       "input_data": {
         "date": "2026-08-06",
         "dateVi": "6 tháng 8 năm 2026",
+        "dateSlash": "06/08/2026",
+        "dateShort": "6/8",
+        "titleVariant": "A",
         "dowVi": "Thứ Năm",
-        "searchPhraseDate": "ngày 6 tháng 8",
+        "searchPhraseDate": "ngày 06/08/2026",
         "lunarLabel": "Ngày 24 tháng Sáu năm Bính Ngọ",
         "canChiDay": "Nhâm Tý",
         "hoangDao": false,
@@ -303,24 +321,27 @@
           "Can chi · lá số: Nạp Âm ngày hành Mộc cộng 15 điểm — đánh giá theo lịch chung, chưa cá nhân hoá lá số.",
           "Giờ vàng: Phần giờ vàng không đổi điểm — đánh giá khung giờ tốt theo lịch chung. Giờ đáng chú ý: Tý (23:00–01:00)."
         ],
-        "hub": "ngay-tot-xau",
+        "hub": "lich-am",
         "siblings": [
-          "ngay-2026-08-03",
-          "ngay-2026-08-04",
-          "ngay-2026-08-05",
-          "ngay-2026-08-07",
-          "ngay-2026-08-08",
-          "ngay-2026-08-09"
+          "ngay-03-08-2026",
+          "ngay-04-08-2026",
+          "ngay-05-08-2026",
+          "ngay-07-08-2026",
+          "ngay-08-08-2026",
+          "ngay-09-08-2026"
         ]
       }
     },
     {
-      "item_key": "ngay-2026-08-07",
+      "item_key": "ngay-07-08-2026",
       "input_data": {
         "date": "2026-08-07",
         "dateVi": "7 tháng 8 năm 2026",
+        "dateSlash": "07/08/2026",
+        "dateShort": "7/8",
+        "titleVariant": "B",
         "dowVi": "Thứ Sáu",
-        "searchPhraseDate": "ngày 7 tháng 8",
+        "searchPhraseDate": "ngày 07/08/2026",
         "lunarLabel": "Ngày 25 tháng Sáu năm Bính Ngọ",
         "canChiDay": "Quý Sửu",
         "hoangDao": false,
@@ -356,24 +377,27 @@
           "Can chi · lá số: Nạp Âm ngày hành Mộc cộng 15 điểm — đánh giá theo lịch chung, chưa cá nhân hoá lá số.",
           "Giờ vàng: Phần giờ vàng không đổi điểm — đánh giá khung giờ tốt theo lịch chung. Giờ đáng chú ý: Dần (03:00–05:00)."
         ],
-        "hub": "ngay-tot-xau",
+        "hub": "lich-am",
         "siblings": [
-          "ngay-2026-08-04",
-          "ngay-2026-08-05",
-          "ngay-2026-08-06",
-          "ngay-2026-08-08",
-          "ngay-2026-08-09",
-          "ngay-2026-08-10"
+          "ngay-04-08-2026",
+          "ngay-05-08-2026",
+          "ngay-06-08-2026",
+          "ngay-08-08-2026",
+          "ngay-09-08-2026",
+          "ngay-10-08-2026"
         ]
       }
     },
     {
-      "item_key": "ngay-2026-08-08",
+      "item_key": "ngay-08-08-2026",
       "input_data": {
         "date": "2026-08-08",
         "dateVi": "8 tháng 8 năm 2026",
+        "dateSlash": "08/08/2026",
+        "dateShort": "8/8",
+        "titleVariant": "A",
         "dowVi": "Thứ Bảy",
-        "searchPhraseDate": "ngày 8 tháng 8",
+        "searchPhraseDate": "ngày 08/08/2026",
         "lunarLabel": "Ngày 26 tháng Sáu năm Bính Ngọ",
         "canChiDay": "Giáp Dần",
         "hoangDao": true,
@@ -409,24 +433,27 @@
           "Can chi · lá số: Nạp Âm ngày hành Thủy cộng 15 điểm — đánh giá theo lịch chung, chưa cá nhân hoá lá số.",
           "Giờ vàng: Phần giờ vàng không đổi điểm — đánh giá khung giờ tốt theo lịch chung. Giờ đáng chú ý: Tý (23:00–01:00)."
         ],
-        "hub": "ngay-tot-xau",
+        "hub": "lich-am",
         "siblings": [
-          "ngay-2026-08-05",
-          "ngay-2026-08-06",
-          "ngay-2026-08-07",
-          "ngay-2026-08-09",
-          "ngay-2026-08-10",
-          "ngay-2026-08-11"
+          "ngay-05-08-2026",
+          "ngay-06-08-2026",
+          "ngay-07-08-2026",
+          "ngay-09-08-2026",
+          "ngay-10-08-2026",
+          "ngay-11-08-2026"
         ]
       }
     },
     {
-      "item_key": "ngay-2026-08-09",
+      "item_key": "ngay-09-08-2026",
       "input_data": {
         "date": "2026-08-09",
         "dateVi": "9 tháng 8 năm 2026",
+        "dateSlash": "09/08/2026",
+        "dateShort": "9/8",
+        "titleVariant": "B",
         "dowVi": "Chủ Nhật",
-        "searchPhraseDate": "ngày 9 tháng 8",
+        "searchPhraseDate": "ngày 09/08/2026",
         "lunarLabel": "Ngày 27 tháng Sáu năm Bính Ngọ",
         "canChiDay": "Ất Mão",
         "hoangDao": true,
@@ -462,24 +489,27 @@
           "Can chi · lá số: Nạp Âm ngày hành Thủy cộng 15 điểm — đánh giá theo lịch chung, chưa cá nhân hoá lá số.",
           "Giờ vàng: Phần giờ vàng không đổi điểm — đánh giá khung giờ tốt theo lịch chung. Giờ đáng chú ý: Dần (03:00–05:00)."
         ],
-        "hub": "ngay-tot-xau",
+        "hub": "lich-am",
         "siblings": [
-          "ngay-2026-08-06",
-          "ngay-2026-08-07",
-          "ngay-2026-08-08",
-          "ngay-2026-08-10",
-          "ngay-2026-08-11",
-          "ngay-2026-08-12"
+          "ngay-06-08-2026",
+          "ngay-07-08-2026",
+          "ngay-08-08-2026",
+          "ngay-10-08-2026",
+          "ngay-11-08-2026",
+          "ngay-12-08-2026"
         ]
       }
     },
     {
-      "item_key": "ngay-2026-08-10",
+      "item_key": "ngay-10-08-2026",
       "input_data": {
         "date": "2026-08-10",
         "dateVi": "10 tháng 8 năm 2026",
+        "dateSlash": "10/08/2026",
+        "dateShort": "10/8",
+        "titleVariant": "A",
         "dowVi": "Thứ Hai",
-        "searchPhraseDate": "ngày 10 tháng 8",
+        "searchPhraseDate": "ngày 10/08/2026",
         "lunarLabel": "Ngày 28 tháng Sáu năm Bính Ngọ",
         "canChiDay": "Bính Thìn",
         "hoangDao": false,
@@ -515,24 +545,27 @@
           "Can chi · lá số: Nạp Âm ngày hành Thổ cộng 15 điểm — đánh giá theo lịch chung, chưa cá nhân hoá lá số.",
           "Giờ vàng: Phần giờ vàng không đổi điểm — đánh giá khung giờ tốt theo lịch chung. Giờ đáng chú ý: Tý (23:00–01:00)."
         ],
-        "hub": "ngay-tot-xau",
+        "hub": "lich-am",
         "siblings": [
-          "ngay-2026-08-07",
-          "ngay-2026-08-08",
-          "ngay-2026-08-09",
-          "ngay-2026-08-11",
-          "ngay-2026-08-12",
-          "ngay-2026-08-13"
+          "ngay-07-08-2026",
+          "ngay-08-08-2026",
+          "ngay-09-08-2026",
+          "ngay-11-08-2026",
+          "ngay-12-08-2026",
+          "ngay-13-08-2026"
         ]
       }
     },
     {
-      "item_key": "ngay-2026-08-11",
+      "item_key": "ngay-11-08-2026",
       "input_data": {
         "date": "2026-08-11",
         "dateVi": "11 tháng 8 năm 2026",
+        "dateSlash": "11/08/2026",
+        "dateShort": "11/8",
+        "titleVariant": "B",
         "dowVi": "Thứ Ba",
-        "searchPhraseDate": "ngày 11 tháng 8",
+        "searchPhraseDate": "ngày 11/08/2026",
         "lunarLabel": "Ngày 29 tháng Sáu năm Bính Ngọ",
         "canChiDay": "Đinh Tỵ",
         "hoangDao": true,
@@ -568,24 +601,27 @@
           "Can chi · lá số: Nạp Âm ngày hành Thổ cộng 15 điểm — đánh giá theo lịch chung, chưa cá nhân hoá lá số.",
           "Giờ vàng: Phần giờ vàng không đổi điểm — đánh giá khung giờ tốt theo lịch chung. Giờ đáng chú ý: Dần (03:00–05:00)."
         ],
-        "hub": "ngay-tot-xau",
+        "hub": "lich-am",
         "siblings": [
-          "ngay-2026-08-08",
-          "ngay-2026-08-09",
-          "ngay-2026-08-10",
-          "ngay-2026-08-12",
-          "ngay-2026-08-13",
-          "ngay-2026-08-14"
+          "ngay-08-08-2026",
+          "ngay-09-08-2026",
+          "ngay-10-08-2026",
+          "ngay-12-08-2026",
+          "ngay-13-08-2026",
+          "ngay-14-08-2026"
         ]
       }
     },
     {
-      "item_key": "ngay-2026-08-12",
+      "item_key": "ngay-12-08-2026",
       "input_data": {
         "date": "2026-08-12",
         "dateVi": "12 tháng 8 năm 2026",
+        "dateSlash": "12/08/2026",
+        "dateShort": "12/8",
+        "titleVariant": "A",
         "dowVi": "Thứ Tư",
-        "searchPhraseDate": "ngày 12 tháng 8",
+        "searchPhraseDate": "ngày 12/08/2026",
         "lunarLabel": "Ngày 30 tháng Sáu năm Bính Ngọ",
         "canChiDay": "Mậu Ngọ",
         "hoangDao": false,
@@ -621,24 +657,27 @@
           "Can chi · lá số: Nạp Âm ngày hành Hỏa cộng 15 điểm — đánh giá theo lịch chung, chưa cá nhân hoá lá số.",
           "Giờ vàng: Phần giờ vàng không đổi điểm — đánh giá khung giờ tốt theo lịch chung. Giờ đáng chú ý: Tý (23:00–01:00)."
         ],
-        "hub": "ngay-tot-xau",
+        "hub": "lich-am",
         "siblings": [
-          "ngay-2026-08-09",
-          "ngay-2026-08-10",
-          "ngay-2026-08-11",
-          "ngay-2026-08-13",
-          "ngay-2026-08-14",
-          "ngay-2026-08-15"
+          "ngay-09-08-2026",
+          "ngay-10-08-2026",
+          "ngay-11-08-2026",
+          "ngay-13-08-2026",
+          "ngay-14-08-2026",
+          "ngay-15-08-2026"
         ]
       }
     },
     {
-      "item_key": "ngay-2026-08-13",
+      "item_key": "ngay-13-08-2026",
       "input_data": {
         "date": "2026-08-13",
         "dateVi": "13 tháng 8 năm 2026",
+        "dateSlash": "13/08/2026",
+        "dateShort": "13/8",
+        "titleVariant": "B",
         "dowVi": "Thứ Năm",
-        "searchPhraseDate": "ngày 13 tháng 8",
+        "searchPhraseDate": "ngày 13/08/2026",
         "lunarLabel": "Ngày 1 tháng Bảy năm Bính Ngọ",
         "canChiDay": "Kỷ Mùi",
         "hoangDao": true,
@@ -674,24 +713,27 @@
           "Can chi · lá số: Nạp Âm ngày hành Hỏa cộng 15 điểm — đánh giá theo lịch chung, chưa cá nhân hoá lá số.",
           "Giờ vàng: Phần giờ vàng không đổi điểm — đánh giá khung giờ tốt theo lịch chung. Giờ đáng chú ý: Dần (03:00–05:00)."
         ],
-        "hub": "ngay-tot-xau",
+        "hub": "lich-am",
         "siblings": [
-          "ngay-2026-08-10",
-          "ngay-2026-08-11",
-          "ngay-2026-08-12",
-          "ngay-2026-08-14",
-          "ngay-2026-08-15",
-          "ngay-2026-08-16"
+          "ngay-10-08-2026",
+          "ngay-11-08-2026",
+          "ngay-12-08-2026",
+          "ngay-14-08-2026",
+          "ngay-15-08-2026",
+          "ngay-16-08-2026"
         ]
       }
     },
     {
-      "item_key": "ngay-2026-08-14",
+      "item_key": "ngay-14-08-2026",
       "input_data": {
         "date": "2026-08-14",
         "dateVi": "14 tháng 8 năm 2026",
+        "dateSlash": "14/08/2026",
+        "dateShort": "14/8",
+        "titleVariant": "A",
         "dowVi": "Thứ Sáu",
-        "searchPhraseDate": "ngày 14 tháng 8",
+        "searchPhraseDate": "ngày 14/08/2026",
         "lunarLabel": "Ngày 2 tháng Bảy năm Bính Ngọ",
         "canChiDay": "Canh Thân",
         "hoangDao": false,
@@ -727,24 +769,27 @@
           "Can chi · lá số: Nạp Âm ngày hành Mộc cộng 15 điểm — đánh giá theo lịch chung, chưa cá nhân hoá lá số.",
           "Giờ vàng: Phần giờ vàng không đổi điểm — đánh giá khung giờ tốt theo lịch chung. Giờ đáng chú ý: Tý (23:00–01:00)."
         ],
-        "hub": "ngay-tot-xau",
+        "hub": "lich-am",
         "siblings": [
-          "ngay-2026-08-11",
-          "ngay-2026-08-12",
-          "ngay-2026-08-13",
-          "ngay-2026-08-15",
-          "ngay-2026-08-16",
-          "ngay-2026-08-17"
+          "ngay-11-08-2026",
+          "ngay-12-08-2026",
+          "ngay-13-08-2026",
+          "ngay-15-08-2026",
+          "ngay-16-08-2026",
+          "ngay-17-08-2026"
         ]
       }
     },
     {
-      "item_key": "ngay-2026-08-15",
+      "item_key": "ngay-15-08-2026",
       "input_data": {
         "date": "2026-08-15",
         "dateVi": "15 tháng 8 năm 2026",
+        "dateSlash": "15/08/2026",
+        "dateShort": "15/8",
+        "titleVariant": "B",
         "dowVi": "Thứ Bảy",
-        "searchPhraseDate": "ngày 15 tháng 8",
+        "searchPhraseDate": "ngày 15/08/2026",
         "lunarLabel": "Ngày 3 tháng Bảy năm Bính Ngọ",
         "canChiDay": "Tân Dậu",
         "hoangDao": false,
@@ -780,24 +825,27 @@
           "Can chi · lá số: Nạp Âm ngày hành Mộc cộng 15 điểm — đánh giá theo lịch chung, chưa cá nhân hoá lá số.",
           "Giờ vàng: Phần giờ vàng không đổi điểm — đánh giá khung giờ tốt theo lịch chung. Giờ đáng chú ý: Dần (03:00–05:00)."
         ],
-        "hub": "ngay-tot-xau",
+        "hub": "lich-am",
         "siblings": [
-          "ngay-2026-08-12",
-          "ngay-2026-08-13",
-          "ngay-2026-08-14",
-          "ngay-2026-08-16",
-          "ngay-2026-08-17",
-          "ngay-2026-08-18"
+          "ngay-12-08-2026",
+          "ngay-13-08-2026",
+          "ngay-14-08-2026",
+          "ngay-16-08-2026",
+          "ngay-17-08-2026",
+          "ngay-18-08-2026"
         ]
       }
     },
     {
-      "item_key": "ngay-2026-08-16",
+      "item_key": "ngay-16-08-2026",
       "input_data": {
         "date": "2026-08-16",
         "dateVi": "16 tháng 8 năm 2026",
+        "dateSlash": "16/08/2026",
+        "dateShort": "16/8",
+        "titleVariant": "A",
         "dowVi": "Chủ Nhật",
-        "searchPhraseDate": "ngày 16 tháng 8",
+        "searchPhraseDate": "ngày 16/08/2026",
         "lunarLabel": "Ngày 4 tháng Bảy năm Bính Ngọ",
         "canChiDay": "Nhâm Tuất",
         "hoangDao": true,
@@ -833,24 +881,27 @@
           "Can chi · lá số: Nạp Âm ngày hành Thủy cộng 15 điểm — đánh giá theo lịch chung, chưa cá nhân hoá lá số.",
           "Giờ vàng: Phần giờ vàng không đổi điểm — đánh giá khung giờ tốt theo lịch chung. Giờ đáng chú ý: Tý (23:00–01:00)."
         ],
-        "hub": "ngay-tot-xau",
+        "hub": "lich-am",
         "siblings": [
-          "ngay-2026-08-13",
-          "ngay-2026-08-14",
-          "ngay-2026-08-15",
-          "ngay-2026-08-17",
-          "ngay-2026-08-18",
-          "ngay-2026-08-19"
+          "ngay-13-08-2026",
+          "ngay-14-08-2026",
+          "ngay-15-08-2026",
+          "ngay-17-08-2026",
+          "ngay-18-08-2026",
+          "ngay-19-08-2026"
         ]
       }
     },
     {
-      "item_key": "ngay-2026-08-17",
+      "item_key": "ngay-17-08-2026",
       "input_data": {
         "date": "2026-08-17",
         "dateVi": "17 tháng 8 năm 2026",
+        "dateSlash": "17/08/2026",
+        "dateShort": "17/8",
+        "titleVariant": "B",
         "dowVi": "Thứ Hai",
-        "searchPhraseDate": "ngày 17 tháng 8",
+        "searchPhraseDate": "ngày 17/08/2026",
         "lunarLabel": "Ngày 5 tháng Bảy năm Bính Ngọ",
         "canChiDay": "Quý Hợi",
         "hoangDao": false,
@@ -886,24 +937,27 @@
           "Can chi · lá số: Nạp Âm ngày hành Thủy cộng 15 điểm — đánh giá theo lịch chung, chưa cá nhân hoá lá số.",
           "Giờ vàng: Phần giờ vàng không đổi điểm — đánh giá khung giờ tốt theo lịch chung. Giờ đáng chú ý: Dần (03:00–05:00)."
         ],
-        "hub": "ngay-tot-xau",
+        "hub": "lich-am",
         "siblings": [
-          "ngay-2026-08-14",
-          "ngay-2026-08-15",
-          "ngay-2026-08-16",
-          "ngay-2026-08-18",
-          "ngay-2026-08-19",
-          "ngay-2026-08-20"
+          "ngay-14-08-2026",
+          "ngay-15-08-2026",
+          "ngay-16-08-2026",
+          "ngay-18-08-2026",
+          "ngay-19-08-2026",
+          "ngay-20-08-2026"
         ]
       }
     },
     {
-      "item_key": "ngay-2026-08-18",
+      "item_key": "ngay-18-08-2026",
       "input_data": {
         "date": "2026-08-18",
         "dateVi": "18 tháng 8 năm 2026",
+        "dateSlash": "18/08/2026",
+        "dateShort": "18/8",
+        "titleVariant": "A",
         "dowVi": "Thứ Ba",
-        "searchPhraseDate": "ngày 18 tháng 8",
+        "searchPhraseDate": "ngày 18/08/2026",
         "lunarLabel": "Ngày 6 tháng Bảy năm Bính Ngọ",
         "canChiDay": "Giáp Tý",
         "hoangDao": true,
@@ -939,24 +993,27 @@
           "Can chi · lá số: Nạp Âm ngày hành Kim cộng 15 điểm — đánh giá theo lịch chung, chưa cá nhân hoá lá số.",
           "Giờ vàng: Phần giờ vàng không đổi điểm — đánh giá khung giờ tốt theo lịch chung. Giờ đáng chú ý: Tý (23:00–01:00)."
         ],
-        "hub": "ngay-tot-xau",
+        "hub": "lich-am",
         "siblings": [
-          "ngay-2026-08-15",
-          "ngay-2026-08-16",
-          "ngay-2026-08-17",
-          "ngay-2026-08-19",
-          "ngay-2026-08-20",
-          "ngay-2026-08-21"
+          "ngay-15-08-2026",
+          "ngay-16-08-2026",
+          "ngay-17-08-2026",
+          "ngay-19-08-2026",
+          "ngay-20-08-2026",
+          "ngay-21-08-2026"
         ]
       }
     },
     {
-      "item_key": "ngay-2026-08-19",
+      "item_key": "ngay-19-08-2026",
       "input_data": {
         "date": "2026-08-19",
         "dateVi": "19 tháng 8 năm 2026",
+        "dateSlash": "19/08/2026",
+        "dateShort": "19/8",
+        "titleVariant": "B",
         "dowVi": "Thứ Tư",
-        "searchPhraseDate": "ngày 19 tháng 8",
+        "searchPhraseDate": "ngày 19/08/2026",
         "lunarLabel": "Ngày 7 tháng Bảy năm Bính Ngọ",
         "canChiDay": "Ất Sửu",
         "hoangDao": true,
@@ -992,24 +1049,27 @@
           "Can chi · lá số: Nạp Âm ngày hành Kim cộng 15 điểm — đánh giá theo lịch chung, chưa cá nhân hoá lá số.",
           "Giờ vàng: Phần giờ vàng không đổi điểm — đánh giá khung giờ tốt theo lịch chung. Giờ đáng chú ý: Dần (03:00–05:00)."
         ],
-        "hub": "ngay-tot-xau",
+        "hub": "lich-am",
         "siblings": [
-          "ngay-2026-08-16",
-          "ngay-2026-08-17",
-          "ngay-2026-08-18",
-          "ngay-2026-08-20",
-          "ngay-2026-08-21",
-          "ngay-2026-08-22"
+          "ngay-16-08-2026",
+          "ngay-17-08-2026",
+          "ngay-18-08-2026",
+          "ngay-20-08-2026",
+          "ngay-21-08-2026",
+          "ngay-22-08-2026"
         ]
       }
     },
     {
-      "item_key": "ngay-2026-08-20",
+      "item_key": "ngay-20-08-2026",
       "input_data": {
         "date": "2026-08-20",
         "dateVi": "20 tháng 8 năm 2026",
+        "dateSlash": "20/08/2026",
+        "dateShort": "20/8",
+        "titleVariant": "A",
         "dowVi": "Thứ Năm",
-        "searchPhraseDate": "ngày 20 tháng 8",
+        "searchPhraseDate": "ngày 20/08/2026",
         "lunarLabel": "Ngày 8 tháng Bảy năm Bính Ngọ",
         "canChiDay": "Bính Dần",
         "hoangDao": false,
@@ -1045,24 +1105,27 @@
           "Can chi · lá số: Nạp Âm ngày hành Hỏa cộng 15 điểm — đánh giá theo lịch chung, chưa cá nhân hoá lá số.",
           "Giờ vàng: Phần giờ vàng không đổi điểm — đánh giá khung giờ tốt theo lịch chung. Giờ đáng chú ý: Tý (23:00–01:00)."
         ],
-        "hub": "ngay-tot-xau",
+        "hub": "lich-am",
         "siblings": [
-          "ngay-2026-08-17",
-          "ngay-2026-08-18",
-          "ngay-2026-08-19",
-          "ngay-2026-08-21",
-          "ngay-2026-08-22",
-          "ngay-2026-08-23"
+          "ngay-17-08-2026",
+          "ngay-18-08-2026",
+          "ngay-19-08-2026",
+          "ngay-21-08-2026",
+          "ngay-22-08-2026",
+          "ngay-23-08-2026"
         ]
       }
     },
     {
-      "item_key": "ngay-2026-08-21",
+      "item_key": "ngay-21-08-2026",
       "input_data": {
         "date": "2026-08-21",
         "dateVi": "21 tháng 8 năm 2026",
+        "dateSlash": "21/08/2026",
+        "dateShort": "21/8",
+        "titleVariant": "B",
         "dowVi": "Thứ Sáu",
-        "searchPhraseDate": "ngày 21 tháng 8",
+        "searchPhraseDate": "ngày 21/08/2026",
         "lunarLabel": "Ngày 9 tháng Bảy năm Bính Ngọ",
         "canChiDay": "Đinh Mão",
         "hoangDao": false,
@@ -1098,24 +1161,27 @@
           "Can chi · lá số: Nạp Âm ngày hành Hỏa cộng 15 điểm — đánh giá theo lịch chung, chưa cá nhân hoá lá số.",
           "Giờ vàng: Phần giờ vàng không đổi điểm — đánh giá khung giờ tốt theo lịch chung. Giờ đáng chú ý: Dần (03:00–05:00)."
         ],
-        "hub": "ngay-tot-xau",
+        "hub": "lich-am",
         "siblings": [
-          "ngay-2026-08-18",
-          "ngay-2026-08-19",
-          "ngay-2026-08-20",
-          "ngay-2026-08-22",
-          "ngay-2026-08-23",
-          "ngay-2026-08-24"
+          "ngay-18-08-2026",
+          "ngay-19-08-2026",
+          "ngay-20-08-2026",
+          "ngay-22-08-2026",
+          "ngay-23-08-2026",
+          "ngay-24-08-2026"
         ]
       }
     },
     {
-      "item_key": "ngay-2026-08-22",
+      "item_key": "ngay-22-08-2026",
       "input_data": {
         "date": "2026-08-22",
         "dateVi": "22 tháng 8 năm 2026",
+        "dateSlash": "22/08/2026",
+        "dateShort": "22/8",
+        "titleVariant": "A",
         "dowVi": "Thứ Bảy",
-        "searchPhraseDate": "ngày 22 tháng 8",
+        "searchPhraseDate": "ngày 22/08/2026",
         "lunarLabel": "Ngày 10 tháng Bảy năm Bính Ngọ",
         "canChiDay": "Mậu Thìn",
         "hoangDao": true,
@@ -1151,24 +1217,27 @@
           "Can chi · lá số: Nạp Âm ngày hành Mộc cộng 15 điểm — đánh giá theo lịch chung, chưa cá nhân hoá lá số.",
           "Giờ vàng: Phần giờ vàng không đổi điểm — đánh giá khung giờ tốt theo lịch chung. Giờ đáng chú ý: Tý (23:00–01:00)."
         ],
-        "hub": "ngay-tot-xau",
+        "hub": "lich-am",
         "siblings": [
-          "ngay-2026-08-19",
-          "ngay-2026-08-20",
-          "ngay-2026-08-21",
-          "ngay-2026-08-23",
-          "ngay-2026-08-24",
-          "ngay-2026-08-25"
+          "ngay-19-08-2026",
+          "ngay-20-08-2026",
+          "ngay-21-08-2026",
+          "ngay-23-08-2026",
+          "ngay-24-08-2026",
+          "ngay-25-08-2026"
         ]
       }
     },
     {
-      "item_key": "ngay-2026-08-23",
+      "item_key": "ngay-23-08-2026",
       "input_data": {
         "date": "2026-08-23",
         "dateVi": "23 tháng 8 năm 2026",
+        "dateSlash": "23/08/2026",
+        "dateShort": "23/8",
+        "titleVariant": "B",
         "dowVi": "Chủ Nhật",
-        "searchPhraseDate": "ngày 23 tháng 8",
+        "searchPhraseDate": "ngày 23/08/2026",
         "lunarLabel": "Ngày 11 tháng Bảy năm Bính Ngọ",
         "canChiDay": "Kỷ Tỵ",
         "hoangDao": true,
@@ -1204,24 +1273,27 @@
           "Can chi · lá số: Nạp Âm ngày hành Mộc cộng 15 điểm — đánh giá theo lịch chung, chưa cá nhân hoá lá số.",
           "Giờ vàng: Phần giờ vàng không đổi điểm — đánh giá khung giờ tốt theo lịch chung. Giờ đáng chú ý: Dần (03:00–05:00)."
         ],
-        "hub": "ngay-tot-xau",
+        "hub": "lich-am",
         "siblings": [
-          "ngay-2026-08-20",
-          "ngay-2026-08-21",
-          "ngay-2026-08-22",
-          "ngay-2026-08-24",
-          "ngay-2026-08-25",
-          "ngay-2026-08-26"
+          "ngay-20-08-2026",
+          "ngay-21-08-2026",
+          "ngay-22-08-2026",
+          "ngay-24-08-2026",
+          "ngay-25-08-2026",
+          "ngay-26-08-2026"
         ]
       }
     },
     {
-      "item_key": "ngay-2026-08-24",
+      "item_key": "ngay-24-08-2026",
       "input_data": {
         "date": "2026-08-24",
         "dateVi": "24 tháng 8 năm 2026",
+        "dateSlash": "24/08/2026",
+        "dateShort": "24/8",
+        "titleVariant": "A",
         "dowVi": "Thứ Hai",
-        "searchPhraseDate": "ngày 24 tháng 8",
+        "searchPhraseDate": "ngày 24/08/2026",
         "lunarLabel": "Ngày 12 tháng Bảy năm Bính Ngọ",
         "canChiDay": "Canh Ngọ",
         "hoangDao": false,
@@ -1257,24 +1329,27 @@
           "Can chi · lá số: Nạp Âm ngày hành Thổ cộng 15 điểm — đánh giá theo lịch chung, chưa cá nhân hoá lá số.",
           "Giờ vàng: Phần giờ vàng không đổi điểm — đánh giá khung giờ tốt theo lịch chung. Giờ đáng chú ý: Tý (23:00–01:00)."
         ],
-        "hub": "ngay-tot-xau",
+        "hub": "lich-am",
         "siblings": [
-          "ngay-2026-08-21",
-          "ngay-2026-08-22",
-          "ngay-2026-08-23",
-          "ngay-2026-08-25",
-          "ngay-2026-08-26",
-          "ngay-2026-08-27"
+          "ngay-21-08-2026",
+          "ngay-22-08-2026",
+          "ngay-23-08-2026",
+          "ngay-25-08-2026",
+          "ngay-26-08-2026",
+          "ngay-27-08-2026"
         ]
       }
     },
     {
-      "item_key": "ngay-2026-08-25",
+      "item_key": "ngay-25-08-2026",
       "input_data": {
         "date": "2026-08-25",
         "dateVi": "25 tháng 8 năm 2026",
+        "dateSlash": "25/08/2026",
+        "dateShort": "25/8",
+        "titleVariant": "B",
         "dowVi": "Thứ Ba",
-        "searchPhraseDate": "ngày 25 tháng 8",
+        "searchPhraseDate": "ngày 25/08/2026",
         "lunarLabel": "Ngày 13 tháng Bảy năm Bính Ngọ",
         "canChiDay": "Tân Mùi",
         "hoangDao": true,
@@ -1310,24 +1385,27 @@
           "Can chi · lá số: Nạp Âm ngày hành Thổ cộng 15 điểm — đánh giá theo lịch chung, chưa cá nhân hoá lá số.",
           "Giờ vàng: Phần giờ vàng không đổi điểm — đánh giá khung giờ tốt theo lịch chung. Giờ đáng chú ý: Dần (03:00–05:00)."
         ],
-        "hub": "ngay-tot-xau",
+        "hub": "lich-am",
         "siblings": [
-          "ngay-2026-08-22",
-          "ngay-2026-08-23",
-          "ngay-2026-08-24",
-          "ngay-2026-08-26",
-          "ngay-2026-08-27",
-          "ngay-2026-08-28"
+          "ngay-22-08-2026",
+          "ngay-23-08-2026",
+          "ngay-24-08-2026",
+          "ngay-26-08-2026",
+          "ngay-27-08-2026",
+          "ngay-28-08-2026"
         ]
       }
     },
     {
-      "item_key": "ngay-2026-08-26",
+      "item_key": "ngay-26-08-2026",
       "input_data": {
         "date": "2026-08-26",
         "dateVi": "26 tháng 8 năm 2026",
+        "dateSlash": "26/08/2026",
+        "dateShort": "26/8",
+        "titleVariant": "A",
         "dowVi": "Thứ Tư",
-        "searchPhraseDate": "ngày 26 tháng 8",
+        "searchPhraseDate": "ngày 26/08/2026",
         "lunarLabel": "Ngày 14 tháng Bảy năm Bính Ngọ",
         "canChiDay": "Nhâm Thân",
         "hoangDao": false,
@@ -1363,24 +1441,27 @@
           "Can chi · lá số: Nạp Âm ngày hành Kim cộng 15 điểm — đánh giá theo lịch chung, chưa cá nhân hoá lá số.",
           "Giờ vàng: Phần giờ vàng không đổi điểm — đánh giá khung giờ tốt theo lịch chung. Giờ đáng chú ý: Tý (23:00–01:00)."
         ],
-        "hub": "ngay-tot-xau",
+        "hub": "lich-am",
         "siblings": [
-          "ngay-2026-08-23",
-          "ngay-2026-08-24",
-          "ngay-2026-08-25",
-          "ngay-2026-08-27",
-          "ngay-2026-08-28",
-          "ngay-2026-08-29"
+          "ngay-23-08-2026",
+          "ngay-24-08-2026",
+          "ngay-25-08-2026",
+          "ngay-27-08-2026",
+          "ngay-28-08-2026",
+          "ngay-29-08-2026"
         ]
       }
     },
     {
-      "item_key": "ngay-2026-08-27",
+      "item_key": "ngay-27-08-2026",
       "input_data": {
         "date": "2026-08-27",
         "dateVi": "27 tháng 8 năm 2026",
+        "dateSlash": "27/08/2026",
+        "dateShort": "27/8",
+        "titleVariant": "B",
         "dowVi": "Thứ Năm",
-        "searchPhraseDate": "ngày 27 tháng 8",
+        "searchPhraseDate": "ngày 27/08/2026",
         "lunarLabel": "Ngày 15 tháng Bảy năm Bính Ngọ",
         "canChiDay": "Quý Dậu",
         "hoangDao": false,
@@ -1416,24 +1497,27 @@
           "Can chi · lá số: Nạp Âm ngày hành Kim cộng 15 điểm — đánh giá theo lịch chung, chưa cá nhân hoá lá số.",
           "Giờ vàng: Phần giờ vàng không đổi điểm — đánh giá khung giờ tốt theo lịch chung. Giờ đáng chú ý: Dần (03:00–05:00)."
         ],
-        "hub": "ngay-tot-xau",
+        "hub": "lich-am",
         "siblings": [
-          "ngay-2026-08-24",
-          "ngay-2026-08-25",
-          "ngay-2026-08-26",
-          "ngay-2026-08-28",
-          "ngay-2026-08-29",
-          "ngay-2026-08-30"
+          "ngay-24-08-2026",
+          "ngay-25-08-2026",
+          "ngay-26-08-2026",
+          "ngay-28-08-2026",
+          "ngay-29-08-2026",
+          "ngay-30-08-2026"
         ]
       }
     },
     {
-      "item_key": "ngay-2026-08-28",
+      "item_key": "ngay-28-08-2026",
       "input_data": {
         "date": "2026-08-28",
         "dateVi": "28 tháng 8 năm 2026",
+        "dateSlash": "28/08/2026",
+        "dateShort": "28/8",
+        "titleVariant": "A",
         "dowVi": "Thứ Sáu",
-        "searchPhraseDate": "ngày 28 tháng 8",
+        "searchPhraseDate": "ngày 28/08/2026",
         "lunarLabel": "Ngày 16 tháng Bảy năm Bính Ngọ",
         "canChiDay": "Giáp Tuất",
         "hoangDao": true,
@@ -1469,24 +1553,27 @@
           "Can chi · lá số: Nạp Âm ngày hành Hỏa cộng 15 điểm — đánh giá theo lịch chung, chưa cá nhân hoá lá số.",
           "Giờ vàng: Phần giờ vàng không đổi điểm — đánh giá khung giờ tốt theo lịch chung. Giờ đáng chú ý: Tý (23:00–01:00)."
         ],
-        "hub": "ngay-tot-xau",
+        "hub": "lich-am",
         "siblings": [
-          "ngay-2026-08-25",
-          "ngay-2026-08-26",
-          "ngay-2026-08-27",
-          "ngay-2026-08-29",
-          "ngay-2026-08-30",
-          "ngay-2026-08-31"
+          "ngay-25-08-2026",
+          "ngay-26-08-2026",
+          "ngay-27-08-2026",
+          "ngay-29-08-2026",
+          "ngay-30-08-2026",
+          "ngay-31-08-2026"
         ]
       }
     },
     {
-      "item_key": "ngay-2026-08-29",
+      "item_key": "ngay-29-08-2026",
       "input_data": {
         "date": "2026-08-29",
         "dateVi": "29 tháng 8 năm 2026",
+        "dateSlash": "29/08/2026",
+        "dateShort": "29/8",
+        "titleVariant": "B",
         "dowVi": "Thứ Bảy",
-        "searchPhraseDate": "ngày 29 tháng 8",
+        "searchPhraseDate": "ngày 29/08/2026",
         "lunarLabel": "Ngày 17 tháng Bảy năm Bính Ngọ",
         "canChiDay": "Ất Hợi",
         "hoangDao": false,
@@ -1522,23 +1609,26 @@
           "Can chi · lá số: Nạp Âm ngày hành Hỏa cộng 15 điểm — đánh giá theo lịch chung, chưa cá nhân hoá lá số.",
           "Giờ vàng: Phần giờ vàng không đổi điểm — đánh giá khung giờ tốt theo lịch chung. Giờ đáng chú ý: Dần (03:00–05:00)."
         ],
-        "hub": "ngay-tot-xau",
+        "hub": "lich-am",
         "siblings": [
-          "ngay-2026-08-26",
-          "ngay-2026-08-27",
-          "ngay-2026-08-28",
-          "ngay-2026-08-30",
-          "ngay-2026-08-31"
+          "ngay-26-08-2026",
+          "ngay-27-08-2026",
+          "ngay-28-08-2026",
+          "ngay-30-08-2026",
+          "ngay-31-08-2026"
         ]
       }
     },
     {
-      "item_key": "ngay-2026-08-30",
+      "item_key": "ngay-30-08-2026",
       "input_data": {
         "date": "2026-08-30",
         "dateVi": "30 tháng 8 năm 2026",
+        "dateSlash": "30/08/2026",
+        "dateShort": "30/8",
+        "titleVariant": "A",
         "dowVi": "Chủ Nhật",
-        "searchPhraseDate": "ngày 30 tháng 8",
+        "searchPhraseDate": "ngày 30/08/2026",
         "lunarLabel": "Ngày 18 tháng Bảy năm Bính Ngọ",
         "canChiDay": "Bính Tý",
         "hoangDao": true,
@@ -1574,22 +1664,25 @@
           "Can chi · lá số: Nạp Âm ngày hành Thủy cộng 15 điểm — đánh giá theo lịch chung, chưa cá nhân hoá lá số.",
           "Giờ vàng: Phần giờ vàng không đổi điểm — đánh giá khung giờ tốt theo lịch chung. Giờ đáng chú ý: Tý (23:00–01:00)."
         ],
-        "hub": "ngay-tot-xau",
+        "hub": "lich-am",
         "siblings": [
-          "ngay-2026-08-27",
-          "ngay-2026-08-28",
-          "ngay-2026-08-29",
-          "ngay-2026-08-31"
+          "ngay-27-08-2026",
+          "ngay-28-08-2026",
+          "ngay-29-08-2026",
+          "ngay-31-08-2026"
         ]
       }
     },
     {
-      "item_key": "ngay-2026-08-31",
+      "item_key": "ngay-31-08-2026",
       "input_data": {
         "date": "2026-08-31",
         "dateVi": "31 tháng 8 năm 2026",
+        "dateSlash": "31/08/2026",
+        "dateShort": "31/8",
+        "titleVariant": "B",
         "dowVi": "Thứ Hai",
-        "searchPhraseDate": "ngày 31 tháng 8",
+        "searchPhraseDate": "ngày 31/08/2026",
         "lunarLabel": "Ngày 19 tháng Bảy năm Bính Ngọ",
         "canChiDay": "Đinh Sửu",
         "hoangDao": true,
@@ -1625,11 +1718,11 @@
           "Can chi · lá số: Nạp Âm ngày hành Thủy cộng 15 điểm — đánh giá theo lịch chung, chưa cá nhân hoá lá số.",
           "Giờ vàng: Phần giờ vàng không đổi điểm — đánh giá khung giờ tốt theo lịch chung. Giờ đáng chú ý: Dần (03:00–05:00)."
         ],
-        "hub": "ngay-tot-xau",
+        "hub": "lich-am",
         "siblings": [
-          "ngay-2026-08-28",
-          "ngay-2026-08-29",
-          "ngay-2026-08-30"
+          "ngay-28-08-2026",
+          "ngay-29-08-2026",
+          "ngay-30-08-2026"
         ]
       }
     }
