@@ -1,43 +1,53 @@
-# sochumenh rollout — demand-phased build of the số-chủ-đạo × sứ-mệnh grid
+# sochumenh rollout — demand-phased build
 
-Strategy companion (the engine never reads this file). It records how the 144
-combo pages are phased by real search demand, and how that demand drives the
-generation order via K1.
+Strategy companion (the engine never reads this file). Real query volumes
+(2,225 rows, DataForSEO 2026-07) showed the combo axis (số chủ đạo × số sứ
+mệnh) has near-zero standalone search demand — almost all real demand is on
+single-index pages (số chủ đạo N, năm cá nhân N, etc.). The site pivoted
+accordingly: it now ships 7 index axes (số chủ đạo, số sứ mệnh, năm cá nhân,
+số linh hồn, số trưởng thành, số thái độ, số nhân cách) with static
+site-authored facts, and combo pages were demoted to a tail cluster (kept,
+not expanded). This file tracks engine-side content for both.
 
-## The axis
+## The axes
 
-`combo-so-chu-dao-su-menh`: life-path (số chủ đạo) × destiny (số sứ mệnh) over
-the 12 core numbers (1–9, 11, 22, 33) → **144 pages**. Each page stands on the
-deterministic fact-set from `@pseo/numerology-core` (harmony, linking, maturity)
-plus its hub + sibling links (K2). Slug: `so-chu-dao-<lp>-su-menh-<dt>`.
+- **`combo-so-chu-dao-su-menh`** (tail — kept at 5 demo pages, not expanded):
+  life-path × destiny over the 12 core numbers → up to 144 possible pages.
+  Slug: `so-chu-dao-<lp>-su-menh-<dt>`.
+- **`index-so-chu-dao`** (pilot, this PR): số chủ đạo 1–9, 10, 11, 22, 33 → 13
+  pages. Slug: `so-chu-dao-<n>`. Highest demand of all axes (`so-chu-dao-3` =
+  10,130/mo summed). See `template.index-so-chu-dao.json` +
+  `worklist.golden.index-so-chu-dao.json`.
+- **6 more index axes queued**, same pattern once `index-so-chu-dao` is
+  reviewed: `index-so-su-menh`, `index-nam-ca-nhan`, `index-so-linh-hon`,
+  `index-so-truong-thanh`, `index-so-thai-do`, `index-so-nhan-cach`.
 
-## Demand data (required before phasing — do NOT invent)
+## Demand data
 
-Real query volumes live in [`keywords.csv`](./keywords.csv) with columns
-`query,volume_mo,maps_to,source`. `maps_to` is the engine `item_key`; `source`
-names the tool + pull date (Google Keyword Planner / GSC / Ahrefs). The engine
-refuses axes whose volumes would have to be invented — fill this from a real
-tool before running anything beyond the golden set.
+Real query volumes live in [`keywords.csv`](./keywords.csv) — 2,225 rows,
+`query,volume_mo,maps_to,source`. `maps_to` is the engine `item_key`; queries
+with no generated target (homepage, hand-authored pillars, blog) keep
+`maps_to` empty — K1 skips them safely. Source: DataForSEO pull, 2026-07
+(144 rows human-reviewed + mapped; 2,081 rows from a broader keyword
+expansion, classified programmatically by axis word + number-in-domain, no
+invented volumes).
 
 ## Phasing → generation order (K1)
 
-1. Pull real volumes into `keywords.csv`.
-2. `node scripts/keywords-to-worklist.mjs seeds/sochumenh/keywords.csv` → a
-   `priorities` map + `item_keys_by_demand`.
-3. Splice `priorities` into the `POST /jobs` body. The drain (batch submit + the
-   sync loop) orders by `priority DESC`, so high-volume pages generate and reach
-   review first. A full-grid run (all 144, `enumerate: combo-grid`) may skip
-   priorities — order is immaterial when everything ships.
+```
+node scripts/keywords-to-worklist.mjs seeds/sochumenh/keywords.csv
+```
+→ `priorities` map + `item_keys_by_demand`. Splice `priorities` into the
+`POST /jobs` body for whichever template you're running; the drain orders
+`priority DESC`.
 
-Suggested phases (tune to the real distribution once `keywords.csv` exists):
-
-| Phase | Scope | Sampling |
+| Phase | Scope | Status |
 |---|---|---|
-| Golden | ✅ done — 5 items, 2 life-paths | 100% |
-| **Persona + v3** | adopt `persona.draft.md` → `persona.md` + template v3 (slimmed prompt, bridge/cta arc — see `v3.PROPOSAL.*.json` header for the recipe); re-golden at 100% | 100% |
-| P1 | top demand tier by volume | 25% |
-| P2 | mid tier | 10–25% |
-| Tail | remaining combos | 5–10% |
+| Combo golden | 5 items, 2 life-paths | ✅ done |
+| **Persona + v3** | `persona.md` activated; combo template bumped to v3 (slimmed system_prompt, `bridge`+`cta` structural) | ✅ **authored + activated this PR** — NOT yet loaded (`validate-seed` + `load-seed` pending; needs a human run — this session has no `deno`) |
+| **`index-so-chu-dao` golden** | 13 items (the whole axis, incl. master numbers 11/22/33), `review_sample_pct: 100` | ✅ template + worklist authored this PR — pending `validate-seed` → `load-seed` → generate → strategist voice sign-off |
+| Other 6 index axes | same pattern | not started — do after `index-so-chu-dao` golden is approved, to catch template-shape issues once instead of ×7 |
+| Combo P1/P2/tail | — | **on hold** — combo has near-zero demand; do not expand past the 5 existing demo pages without new evidence |
 
 Gate each phase on the previous one's index-coverage (GSC) before opening the
 next — pace by indexation, not generation capacity.
