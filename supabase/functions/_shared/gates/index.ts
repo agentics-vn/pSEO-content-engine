@@ -56,8 +56,10 @@ function resolveLengthTarget(output: Record<string, unknown>, field: string): un
  * paragraph 21 chars long is harmless, but a `metaDescription`/`seoTitle` past
  * its SERP-truncation limit is worth a human trim. So the gate only hard-fails
  * when at least one under-min/missing violation exists; a purely over-max result
- * is downgraded to 'flag'. A template can still force uniform severity via
- * guards.length.severity (applied in runItemGates).
+ * is always 'flag'. guards.length.severity governs the HARD direction only
+ * (set 'flag' to make even under-min non-blocking); it can never promote
+ * over-max back to a blocking fail, so runItemGates must not blanket-override
+ * this gate's severity.
  */
 export function gateLength(ctx: GateContext): GateResult {
   const fields = ctx.guards.length?.fields ?? {};
@@ -71,7 +73,8 @@ export function gateLength(ctx: GateContext): GateResult {
     else if (len > bounds[1]) soft.push(`${field}: ${len}>${bounds[1]}`);
   }
   const viol = [...hard, ...soft];
-  return { gate: 'length', severity: hard.length > 0 ? 'fail' : 'flag',
+  const hardSeverity: Severity = ctx.guards.length?.severity === 'flag' ? 'flag' : 'fail';
+  return { gate: 'length', severity: hard.length > 0 ? hardSeverity : 'flag',
            passed: viol.length === 0, detail: viol.join('; ') || undefined };
 }
 
@@ -320,12 +323,16 @@ const PER_ITEM = [gateUnicode, gateLength, gateRequiredMentions, gateBannedPhras
 /** Run all configured per-item gates. Schema/faq_shape are checked upstream by
  *  strict tool use + a shape assert; those results should be merged in.
  *  A gate's default severity can be overridden per template via
- *  guards[gate].severity — severity is tenant data, not engine code. */
+ *  guards[gate].severity — severity is tenant data, not engine code.
+ *  Exception: `length` applies its configured severity internally and only to
+ *  the hard direction (under-min/missing); a blanket override here would
+ *  re-promote its over-max 'flag' downgrade back to a blocking fail. */
 export function runItemGates(ctx: GateContext): GateResult[] {
   return PER_ITEM
     .map(fn => fn(ctx))
     .filter(r => ctx.guards[r.gate] !== undefined) // only run gates present in guards
     .map(r => {
+      if (r.gate === 'length') return r;
       const configured = ctx.guards[r.gate]?.severity;
       return configured === 'fail' || configured === 'flag' ? { ...r, severity: configured as Severity } : r;
     });

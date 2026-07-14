@@ -57,6 +57,24 @@ Deno.test('gateLength hard-fails under-min/missing, soft-flags over-max', () => 
   assertEquals(mix.severity, 'fail');
 });
 
+Deno.test('guards.length.severity governs the hard direction only — never re-promotes over-max', () => {
+  // Regression: sochumenh's golden run — templates declare severity 'fail' and
+  // runItemGates used to blanket-override the gate result, turning over-max-only
+  // items (career 655>650, …) into blocking failed_validation.
+  const guards = { length: { severity: 'fail', fields: { intro: [5, 10] } } };
+  const overOnly = runItemGates(baseCtx({ output: { intro: 'mười một kýy' }, guards })) // 12 > 10
+    .find((r) => r.gate === 'length')!;
+  assertEquals(overOnly.passed, false);
+  assertEquals(overOnly.severity, 'flag'); // over-max stays non-blocking despite severity: 'fail'
+  const underStillFails = runItemGates(baseCtx({ output: { intro: 'ngắn' }, guards }))
+    .find((r) => r.gate === 'length')!;
+  assertEquals(underStillFails.severity, 'fail');
+  // severity 'flag' opts the hard direction down too (tenant data wins there)
+  const softGuards = { length: { severity: 'flag', fields: { intro: [5, 10] } } };
+  const underSoft = gateLength(baseCtx({ output: { intro: 'ngắn' }, guards: softGuards }));
+  assertEquals(underSoft.severity, 'flag');
+});
+
 Deno.test('gateLength bounds array elements via field.N (ngaylanhthangtot)', () => {
   const guards = { length: { fields: { 'phanTich.0': [3, 10], 'phanTich.1': [3, 10] } } };
   assert(gateLength(baseCtx({ output: { phanTich: ['bốn từ', 'sáu ký tự'] }, guards })).passed); // 6 & 9 ∈ [3,10]
