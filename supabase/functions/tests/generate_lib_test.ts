@@ -179,6 +179,9 @@ function validItem(): Record<string, unknown> {
     career: pad('Nghề viết, nghiên cứu, giảng dạy hợp tổ hợp này.', 400),
     love: pad('Trong tình cảm, 7 và 3 cần nhịp riêng.', 400),
     advice: pad('Hãy cho mình không gian tĩnh rồi chia sẻ.', 400),
+    // v3 persuasion-arc fields (the fixture tracks the REAL seed template):
+    bridge: pad('Trang này mở một góc nhìn về tổ hợp 7 và 3; bản đồ số đầy đủ mới trả lời trọn.', 300),
+    cta: pad('Tra cứu bản đồ số đầy đủ của bạn trên sochumenh để đi tiếp.', 120),
     faqs: [
       { q: 'Chỉ số liên kết của tôi là bao nhiêu?', a: pad('Chỉ số liên kết của bạn là 4, nói về khoảng cách giữa hai chỉ số.', 250) },
       { q: 'Số trưởng thành nghĩa là gì?', a: pad('Số trưởng thành của bạn là 1, giai đoạn sau của cuộc đời.', 250) },

@@ -64,9 +64,22 @@ export function JobsPage({
     };
     if (useRaw) {
       try {
-        input = { ...input, items: JSON.parse(itemsJson) };
+        const parsed = JSON.parse(itemsJson);
+        if (Array.isArray(parsed)) {
+          input = { ...input, items: parsed };
+        } else if (parsed && typeof parsed === 'object') {
+          // Full job body (a worklist.golden.*.json pastes VERBATIM): its keys
+          // win over the form fields, so template_key/mode/review_sample_pct/
+          // priorities travel with the file the strategist authored.
+          const allowed = ['template_key', 'template_version', 'items', 'item_keys', 'mode', 'priorities', 'review_sample_pct'] as const;
+          const body = Object.fromEntries(Object.entries(parsed).filter(([k]) => (allowed as readonly string[]).includes(k)));
+          if (!body.items && !body.item_keys) throw new Error('no items/item_keys');
+          input = { ...input, ...body } as CreateJobInput;
+        } else {
+          throw new Error('not an array or object');
+        }
       } catch {
-        notify('Invalid items JSON', true);
+        notify('Invalid JSON — paste an items array OR a full job body (worklist file)', true);
         setBusy(false);
         return;
       }
@@ -184,6 +197,10 @@ export function JobsPage({
             ) : (
               <div className="full">
                 <textarea rows={6} className="code-input" value={itemsJson} onChange={(e) => setItemsJson(e.target.value)} />
+                <p className="hint">
+                  Accepts an <code>items</code> array, or a FULL job body — paste a
+                  {' '}<code>worklist.golden.*.json</code> verbatim (its template_key/mode/priorities/sample&nbsp;% win over the fields above).
+                </p>
               </div>
             )}
           </div>

@@ -158,6 +158,11 @@ Severity: `"fail"` blocks approve/publish (hard, non-overridable in review);
 - `{name}` and dot paths `{lp.archetype}` resolve from `input_data`. Arrays
   render joined with `", "`. **An unknown placeholder throws at generation**
   — never ships literally.
+- **Placeholders resolve ONLY in `user_template` and guard configs — never in
+  `system_prompt`.** The system prompt is the cached static prefix
+  (byte-identical across every item of a template, by design); a `{token}`
+  there ships to the model literally. Refer to the per-item value generically
+  ("số N của trang, cho trong dữ kiện") — `validate-seed` errors on this.
 - Must contain `{constraint_notes}` where the length/count/mention rules
   should be injected (otherwise they're appended at the end).
 - The same `{token}` syntax works inside guard configs (§2.2).

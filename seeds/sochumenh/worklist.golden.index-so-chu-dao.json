@@ -36,7 +36,8 @@
           "so-chu-dao-11",
           "so-chu-dao-22",
           "so-chu-dao-33"
-        ]
+        ],
+        "nRoot": 1
       }
     },
     {
@@ -73,7 +74,8 @@
           "so-chu-dao-11",
           "so-chu-dao-22",
           "so-chu-dao-33"
-        ]
+        ],
+        "nRoot": 2
       }
     },
     {
@@ -110,7 +112,8 @@
           "so-chu-dao-11",
           "so-chu-dao-22",
           "so-chu-dao-33"
-        ]
+        ],
+        "nRoot": 3
       }
     },
     {
@@ -147,7 +150,8 @@
           "so-chu-dao-11",
           "so-chu-dao-22",
           "so-chu-dao-33"
-        ]
+        ],
+        "nRoot": 4
       }
     },
     {
@@ -184,7 +188,8 @@
           "so-chu-dao-11",
           "so-chu-dao-22",
           "so-chu-dao-33"
-        ]
+        ],
+        "nRoot": 5
       }
     },
     {
@@ -221,7 +226,8 @@
           "so-chu-dao-11",
           "so-chu-dao-22",
           "so-chu-dao-33"
-        ]
+        ],
+        "nRoot": 6
       }
     },
     {
@@ -258,7 +264,8 @@
           "so-chu-dao-11",
           "so-chu-dao-22",
           "so-chu-dao-33"
-        ]
+        ],
+        "nRoot": 7
       }
     },
     {
@@ -295,7 +302,8 @@
           "so-chu-dao-11",
           "so-chu-dao-22",
           "so-chu-dao-33"
-        ]
+        ],
+        "nRoot": 8
       }
     },
     {
@@ -332,7 +340,8 @@
           "so-chu-dao-11",
           "so-chu-dao-22",
           "so-chu-dao-33"
-        ]
+        ],
+        "nRoot": 9
       }
     },
     {
@@ -369,7 +378,8 @@
           "so-chu-dao-11",
           "so-chu-dao-22",
           "so-chu-dao-33"
-        ]
+        ],
+        "nRoot": 1
       }
     },
     {
@@ -406,7 +416,8 @@
           "so-chu-dao-10",
           "so-chu-dao-22",
           "so-chu-dao-33"
-        ]
+        ],
+        "nRoot": 2
       }
     },
     {
@@ -443,7 +454,8 @@
           "so-chu-dao-10",
           "so-chu-dao-11",
           "so-chu-dao-33"
-        ]
+        ],
+        "nRoot": 4
       }
     },
     {
@@ -480,7 +492,8 @@
           "so-chu-dao-10",
           "so-chu-dao-11",
           "so-chu-dao-22"
-        ]
+        ],
+        "nRoot": 6
       }
     }
   ],
