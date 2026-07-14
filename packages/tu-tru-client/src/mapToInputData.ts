@@ -17,10 +17,14 @@
 import type { DayDetailGeneric, Grade } from './types.ts';
 
 export interface NgayTotXauFacts {
-  date: string; //             "2026-05-28" (ISO, becomes part of item_key)
-  dateVi: string; //           "28 tháng 5 năm 2026" — display + required_mentions token
+  date: string; //             "2026-05-28" (ISO)
+  dateVi: string; //           "28 tháng 5 năm 2026" — text form (synonym coverage)
+  dateSlash: string; //        "28/05/2026" — the CANONICAL numeric form real queries use
+  //                           (seo spec §2.2: "ngày {dd/mm/yyyy} tốt hay xấu")
+  dateShort: string; //        "28/5" — unpadded d/m
+  titleVariant: 'A' | 'B'; //  seo spec §2.2 A/B title split: even day → A, odd → B
   dowVi: string; //            "Thứ Năm"
-  searchPhraseDate: string; // "ngày 28 tháng 5" — PROVISIONAL keyword_density phrase
+  searchPhraseDate: string; // "ngày 28/05/2026" — keyword_density phrase (numeric, per spec)
   lunarLabel: string; //       contains the YEAR's Can Chi as embedded text
   canChiDay: string; //        the DAY's Can Chi
   hoangDao: boolean;
@@ -53,12 +57,17 @@ export function mapToInputData(raw: DayDetailGeneric): NgayTotXauFacts {
   const [y, m, d] = raw.date.split('-').map(Number);
   if (!y || !m || !d) throw new Error(`bad ISO date from API: ${JSON.stringify(raw.date)}`);
   const dow = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const dateSlash = `${pad(d)}/${pad(m)}/${y}`;
 
   return {
     date: raw.date,
     dateVi: `${d} tháng ${m} năm ${y}`,
+    dateSlash,
+    dateShort: `${d}/${m}`,
+    titleVariant: d % 2 === 0 ? 'A' : 'B',
     dowVi: DOW_VI[dow],
-    searchPhraseDate: `ngày ${d} tháng ${m}`,
+    searchPhraseDate: `ngày ${dateSlash}`,
     lunarLabel: raw.lunar_label,
     canChiDay: raw.can_chi_day,
     hoangDao: raw.hoang_dao,

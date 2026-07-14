@@ -24,8 +24,11 @@ test('maps the real 2026-05-28 fixture to template facts', () => {
   const f = mapToInputData(fixture);
   assert.equal(f.date, '2026-05-28');
   assert.equal(f.dateVi, '28 tháng 5 năm 2026');
+  assert.equal(f.dateSlash, '28/05/2026');
+  assert.equal(f.dateShort, '28/5');
+  assert.equal(f.titleVariant, 'A'); // day 28 is even → variant A (seo spec §2.2)
   assert.equal(f.dowVi, 'Thứ Năm'); // 2026-05-28 is a Thursday
-  assert.equal(f.searchPhraseDate, 'ngày 28 tháng 5');
+  assert.equal(f.searchPhraseDate, 'ngày 28/05/2026');
   assert.equal(f.canChiDay, 'Nhâm Dần');
   assert.equal(f.lunarLabel, 'Ngày 12 tháng Tư năm Bính Ngọ');
   assert.equal(f.hoangDao, false);
@@ -63,6 +66,14 @@ test('hung_ngay rules join when present; grade labels cover A–C too', () => {
   assert.equal(withHung.gradeLabel, 'Ngày rất tốt');
   assert.equal(mapToInputData({ ...fixture, grade: 'B' }).gradeLabel, 'Ngày tốt');
   assert.equal(mapToInputData({ ...fixture, grade: 'C' }).gradeLabel, 'Ngày bình thường');
+});
+
+test('title variant flips on day parity; single-digit days pad in dateSlash only', () => {
+  const odd = mapToInputData({ ...fixture, date: '2026-08-01' });
+  assert.equal(odd.titleVariant, 'B'); // day 1 is odd → B
+  assert.equal(odd.dateSlash, '01/08/2026'); // padded canonical form
+  assert.equal(odd.dateShort, '1/8'); //        unpadded short form
+  assert.equal(odd.searchPhraseDate, 'ngày 01/08/2026');
 });
 
 test('rejects a malformed date instead of silently mis-deriving dowVi', () => {
