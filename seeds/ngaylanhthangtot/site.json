@@ -1,0 +1,6 @@
+{
+  "slug": "ngaylanhthangtot",
+  "name": "Ngày Lành Tháng Tốt",
+  "domain": "ngaylanhthangtot.vn",
+  "notes": "Tenant #2 — the original single-tenant site this engine was generalized from (architecture.md §15), re-onboarded clean-slate. Domain facts come from the third-party tu-tru-api service (agentics-vn/tu-tru-api, GET /v1/day-detail?mode=generic) via the offline worklist script scripts/build-worklist-ngay-tot-xau.mjs — the engine itself makes no live network calls (packages/tu-tru-client is never imported by supabase/functions). First axis: one page per calendar date, generic (non-personalized) day-quality content."
+}

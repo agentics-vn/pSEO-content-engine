@@ -7,7 +7,7 @@ on:
 
 jobs:
   core:
-    name: numerology-core (Node)
+    name: packages (Node)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -16,6 +16,8 @@ jobs:
       - run: npm ci
       - run: npm test -w @pseo/numerology-core
       - run: npm run typecheck -w @pseo/numerology-core
+      - run: npm test -w @pseo/tu-tru-client
+      - run: npm run typecheck -w @pseo/tu-tru-client
 
   functions:
     name: edge functions (Deno)
