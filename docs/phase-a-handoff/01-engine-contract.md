@@ -1,7 +1,7 @@
 # Phase A hand-off contract
 
 **Audience: the Claude Code session working in a CLIENT SITE repo** (sochudao,
-ngaylanhthangtot, …) doing SEO strategy + template authoring. This document
+…) doing SEO strategy + template authoring. This document
 is the complete specification of (1) what you must produce, and (2) exactly
 what the engine accepts — field by field, gate by gate, as implemented. If
 you follow this doc, `scripts/validate-seed.ts` passes and the engine

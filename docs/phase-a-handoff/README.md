@@ -1,7 +1,7 @@
 # Phase A handoff bundle — start here
 
 **You are a Claude Code session working inside a client SITE repo** (e.g.
-`sochudao`, `ngaylanhthangtot`). Your job is **Phase A**: turn SEO strategy into
+`sochudao`). Your job is **Phase A**: turn SEO strategy into
 (1) a few real demo pages in this repo and (2) a `seeds/<client>/` folder that a
 separate content **engine** will generate from at scale. You do **not** call any
 LLM to write article bodies — the engine does that later. You design the page
