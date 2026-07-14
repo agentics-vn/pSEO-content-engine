@@ -1,0 +1,100 @@
+{
+  "key": "ngay-tot-xau",
+  "version": 1,
+  "name": "Ngày tốt xấu (calendar day-quality — generic axis)",
+  "system_prompt": "Bạn viết trang \"Ngày [ngày] tốt hay xấu\" cho ngaylanhthangtot.vn — đánh giá MỘT ngày dương lịch cụ thể theo lịch âm truyền thống, KHÔNG cá nhân hoá theo ngày sinh người đọc (trang dùng lịch chung, không có dữ kiện riêng của bất kỳ ai).\n\nNGUYÊN TẮC BẮT BUỘC (chỉ riêng template này — doctrine giọng văn/đạo đức đã có ở lớp persona, không lặp lại ở đây):\n- CHỈ viết dựa trên DỮ KIỆN được cung cấp (Can Chi, Trực, Sao, Hoàng Đạo/Hắc Đạo, điểm số, giờ tốt/xấu, diễn giải điểm). TUYỆT ĐỐI KHÔNG bịa Can Chi, Trực hay Sao nào không có trong dữ kiện của CHÍNH ngày đang viết — kể cả để so sánh với ngày khác.\n- \"phanTich\" có ĐÚNG 2 phần tử: phần 1 = tổng quan ngắn gọn (Hoàng Đạo/Hắc Đạo, điểm số, xếp hạng — trả lời thẳng câu hỏi tốt hay xấu); phần 2 = luận giải chi tiết hơn dựa trên diễn giải điểm số (Trực, Sao, Nạp Âm của riêng ngày này).\n- \"nenKiengKy\" nói rõ đây là đánh giá THEO LỊCH CHUNG: dựa trên Hoàng Đạo/Hắc Đạo, Trực và Sao mà khuyên ở mức TỔNG QUÁT (ví dụ ngày điểm cao hợp khởi sự việc quan trọng, ngày điểm thấp nên hoãn việc lớn) — KHÔNG bịa danh sách hợp/kỵ cho từng việc cụ thể (khai trương, cưới hỏi, động thổ...) vì dữ kiện lịch chung không cung cấp mức phù hợp riêng cho từng việc; và nhắc rằng mức hợp với từng người còn tuỳ tuổi/lá số riêng.\n- \"gioTotXau\" nêu cụ thể các khung giờ tốt và giờ xấu trong dữ kiện, gợi ý tổng quát nên ưu tiên khung giờ tốt cho việc cần khởi đầu suôn sẻ.\n- \"saoVaTruc\" giải thích dễ hiểu ý nghĩa của Trực và Sao (Nhị thập bát tú) của ngày — chỉ dùng đúng tên Trực/Sao trong dữ kiện.\n- Không đưa lời khuyên y tế/tài chính/pháp lý dù ngày có liên quan tới khám bệnh, ký kết, đầu tư.\n- Mở bài và mở đầu MỖI trường (2 phần tử phanTich, gioTotXau, nenKiengKy, saoVaTruc) phải khác nhau về cấu trúc câu giữa các ngày. TUYỆT ĐỐI KHÔNG dùng khuôn lặp \"Ngày [X] là một ngày...\", \"Hôm nay là...\", \"Theo lịch vạn niên...\". Nếu thấy câu mở giống ngày khác đã viết, đổi hẳn cách vào.",
+  "user_template": "Viết trang đánh giá ngày {dateVi} ({dowVi}) với dữ kiện sau (không tính lại, không bịa thêm):\n\n- Ngày dương: {date}\n- Âm lịch: {lunarLabel}\n- Can Chi ngày: {canChiDay}\n- Trạng thái: {hoangDaoLabel} (sao {starName})\n- Trực: {trucName}\n- Sao Nhị thập bát tú: {sao28} (hành {saoElement})\n- Điểm số: {score}/{scoreMax} — xếp hạng {grade} ({gradeLabel})\n- Diễn giải điểm số: {breakdownLines}\n- Giờ hoàng đạo (tốt): {gioTotList}\n- Giờ hắc đạo (xấu): {gioXauList}\n- Ngày kỵ đặc biệt: {hungNgayText}\n\nViết theo đúng schema: title (H1 chứa ngày {dateVi}), seoTitle (thẻ <title> ngắn cho SERP, KHÁC title), metaDescription, phanTich (đúng 2 phần tử), gioTotXau, nenKiengKy, saoVaTruc, và đúng 5 FAQ — trong đó BẮT BUỘC có: 1 FAQ \"Ngày {dateVi} là ngày tốt hay xấu?\", 1 FAQ về giờ hoàng đạo của ngày này, 1 FAQ \"Ngày {dateVi} âm lịch là ngày nào?\".\n{constraint_notes}",
+  "output_schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["title", "seoTitle", "metaDescription", "phanTich", "gioTotXau", "nenKiengKy", "saoVaTruc", "faqs"],
+    "properties": {
+      "title": { "type": "string" },
+      "seoTitle": { "type": "string" },
+      "metaDescription": { "type": "string" },
+      "phanTich": {
+        "type": "array",
+        "minItems": 2,
+        "maxItems": 2,
+        "items": { "type": "string" }
+      },
+      "gioTotXau": { "type": "string" },
+      "nenKiengKy": { "type": "string" },
+      "saoVaTruc": { "type": "string" },
+      "faqs": {
+        "type": "array",
+        "minItems": 5,
+        "maxItems": 5,
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["q", "a"],
+          "properties": { "q": { "type": "string" }, "a": { "type": "string" } }
+        }
+      }
+    }
+  },
+  "few_shots": [],
+  "few_shots_note": "Start empty for the golden set. After strategist review, distill ≤3 approved outputs spanning BOTH a hoàng-đạo high-grade day and a hắc-đạo low-grade day (so the cheap-model tier sees both verdict shapes), then consider switching model for the full-year batch.",
+  "guards": {
+    "schema": { "severity": "fail" },
+    "unicode": { "severity": "fail", "form": "NFC" },
+    "length": {
+      "severity": "fail",
+      "fields": {
+        "title": [20, 70],
+        "seoTitle": [30, 65],
+        "metaDescription": [120, 165],
+        "phanTich.0": [250, 550],
+        "phanTich.1": [300, 650],
+        "gioTotXau": [200, 450],
+        "nenKiengKy": [200, 450],
+        "saoVaTruc": [200, 450]
+      },
+      "note": "PROVISIONAL bounds — no real SERP data for this tenant yet; recalibrate against competitor pages after the golden review, before the full-year batch."
+    },
+    "required_mentions": {
+      "severity": "fail",
+      "rules": [
+        { "field": "title", "must_contain": ["{dateVi}"], "ci": true },
+        { "field": "seoTitle", "must_contain": ["{dateVi}"], "ci": true },
+        { "field": "metaDescription", "must_contain": ["{dateVi}"], "ci": true }
+      ]
+    },
+    "entity_consistency": {
+      "severity": "fail",
+      "pattern": "(Giáp|Ất|Bính|Đinh|Mậu|Kỷ|Canh|Tân|Nhâm|Quý)\\s+(Tý|Sửu|Dần|Mão|Thìn|Tỵ|Ngọ|Mùi|Thân|Dậu|Tuất|Hợi)",
+      "allowed": ["{canChiDay}", "{lunarLabel}"],
+      "note": "The original single-tenant canchi_consistency guarantee (the Kỷ-Dậu-invented bug): any Can-Chi pair in the prose must be this day's own (canChiDay) or the year's (embedded in lunarLabel). The gate substring-checks the joined allowed list, so these two tokens cover both."
+    },
+    "banned_phrases": {
+      "severity": "fail",
+      "list": ["chắc chắn phát tài", "chắc chắn gặp hoạ", "chắc chắn thành công", "đảm bảo", "100%", "tuyệt đối sẽ", "đại hoạ", "chữa khỏi"]
+    },
+    "faq_shape": {
+      "severity": "fail",
+      "count": 5,
+      "answers_must_contain": ["{dateVi}"],
+      "note": "exactly 5 faqs; at least one answer states the full date (featured-snippet friendly)"
+    },
+    "keyword_density": {
+      "severity": "flag",
+      "keywords": ["{searchPhraseDate}"],
+      "min_count": 2,
+      "max_density": 0.04,
+      "fields": ["phanTich.0", "phanTich.1", "gioTotXau", "nenKiengKy"],
+      "note": "PROVISIONAL phrase shape (\"ngày D tháng M\") — no keywords.csv for this tenant yet; replace with the real demand phrase once query data exists. Flag-only: reviewer judges."
+    },
+    "phrase_frequency": { "severity": "flag", "scope": "batch" },
+    "similarity": {
+      "severity": "flag",
+      "scope": "batch",
+      "method": "ngram_tfidf_cosine",
+      "max_pairwise": 0.55,
+      "note": "A calendar axis repeats structure day-over-day by nature — expect flags; the phrase_frequency + varied-openings prompt rule are the real defenses. numeric_consistency is intentionally OMITTED: it is tuned for 0–33 integers (validate-seed warns), while these pages legitimately contain scores 0–100, hour ranges, and full dates; fidelity is enforced by required_mentions + entity_consistency instead."
+    }
+  },
+  "model": "claude-sonnet-5",
+  "temperature": 0.7,
+  "max_tokens": 4200
+}
