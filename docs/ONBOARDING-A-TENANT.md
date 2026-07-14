@@ -3,7 +3,7 @@
 ## The recommended flow: strategy lives in the SITE repo
 
 Seat 1 works best where the pages will actually render — run Claude Code in
-the client's site repo (sochudao, ngaylanhthangtot, …), where the design
+the client's site repo (sochudao, …), where the design
 system, existing pages, and real GSC data are at hand:
 
 ```

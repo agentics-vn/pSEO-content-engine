@@ -63,7 +63,7 @@ seo-engine/                      ← NEW, standalone repo
 └── Admin UI (multi-tenant)      ← pick a site, then operate its
                                     templates/jobs/review queue
 
-app-a/  (e.g. ngaylanhthangtot)   ├── OWN Supabase project
+app-a/  (e.g. sochudao)         ├── OWN Supabase project
 app-b/  (future tenant)          ├── OWN backend/API layer
 app-c/  (future tenant)          ┘  ├── calls seo-engine's content-api
                                      ├── stores the result in its own DB

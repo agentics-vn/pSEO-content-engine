@@ -76,7 +76,7 @@ Deno.test('guards.length.severity governs the hard direction only — never re-p
   assertEquals(underSoft.severity, 'flag');
 });
 
-Deno.test('gateLength bounds array elements via field.N (ngaylanhthangtot)', () => {
+Deno.test('gateLength bounds array elements via field.N (array-of-paragraphs verticals)', () => {
   const guards = { length: { fields: { 'phanTich.0': [3, 10], 'phanTich.1': [3, 10] } } };
   assert(gateLength(baseCtx({ output: { phanTich: ['bốn từ', 'sáu ký tự'] }, guards })).passed); // 6 & 9 ∈ [3,10]
   // second element too long → trips
