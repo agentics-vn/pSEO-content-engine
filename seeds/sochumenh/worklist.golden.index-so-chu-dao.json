@@ -1,0 +1,502 @@
+{
+  "template_key": "index-so-chu-dao",
+  "review_sample_pct": 100,
+  "items": [
+    {
+      "item_key": "so-chu-dao-1",
+      "input_data": {
+        "n": 1,
+        "label": "Số chủ đạo",
+        "archetype": "Nhà lãnh đạo",
+        "keyword": "Khởi đầu & độc lập",
+        "essence": "Số 1 là năng lượng khởi phát — ý chí bắt đầu, tự quyết và đứng trên đôi chân mình. Người mang số 1 có bản năng mở đường, không thích đi theo lối mòn và luôn muốn để lại dấu ấn riêng.",
+        "strengths": [
+          "Quyết đoán",
+          "Tiên phong",
+          "Tự tin"
+        ],
+        "challenges": [
+          "Ôm việc một mình",
+          "Cứng nhắc",
+          "Thiếu kiên nhẫn"
+        ],
+        "framing": "hành trình học cách tự lập, mở đường và tin vào quyết định của chính mình",
+        "masterNote": "",
+        "hub": "so-chu-dao",
+        "siblings": [
+          "so-chu-dao-2",
+          "so-chu-dao-3",
+          "so-chu-dao-4",
+          "so-chu-dao-5",
+          "so-chu-dao-6",
+          "so-chu-dao-7",
+          "so-chu-dao-8",
+          "so-chu-dao-9",
+          "so-chu-dao-10",
+          "so-chu-dao-11",
+          "so-chu-dao-22",
+          "so-chu-dao-33"
+        ]
+      }
+    },
+    {
+      "item_key": "so-chu-dao-2",
+      "input_data": {
+        "n": 2,
+        "label": "Số chủ đạo",
+        "archetype": "Người kết nối",
+        "keyword": "Hoà hợp & đồng cảm",
+        "essence": "Số 2 là năng lượng của sự kết nối — kiên nhẫn, ngoại giao và một trái tim biết lắng nghe. Người mang số 2 cảm nhận tinh tế nhịp cảm xúc của người khác và giỏi hoà giải, gắn kết.",
+        "strengths": [
+          "Tinh tế",
+          "Hợp tác",
+          "Thấu cảm"
+        ],
+        "challenges": [
+          "Ngại nêu nhu cầu",
+          "Nhạy cảm thái quá",
+          "Phụ thuộc"
+        ],
+        "framing": "hành trình học cách hoà giải, xây dựng quan hệ và trân trọng giá trị bản thân",
+        "masterNote": "",
+        "hub": "so-chu-dao",
+        "siblings": [
+          "so-chu-dao-1",
+          "so-chu-dao-3",
+          "so-chu-dao-4",
+          "so-chu-dao-5",
+          "so-chu-dao-6",
+          "so-chu-dao-7",
+          "so-chu-dao-8",
+          "so-chu-dao-9",
+          "so-chu-dao-10",
+          "so-chu-dao-11",
+          "so-chu-dao-22",
+          "so-chu-dao-33"
+        ]
+      }
+    },
+    {
+      "item_key": "so-chu-dao-3",
+      "input_data": {
+        "n": 3,
+        "label": "Số chủ đạo",
+        "archetype": "Người sáng tạo",
+        "keyword": "Biểu đạt & cảm hứng",
+        "essence": "Số 3 là năng lượng biểu đạt — sáng tạo, lạc quan và giàu sức truyền cảm. Người mang số 3 chạm tới người khác qua ngôn từ, hình ảnh và cảm xúc, thắp sáng bầu không khí quanh mình.",
+        "strengths": [
+          "Sáng tạo",
+          "Giao tiếp",
+          "Lạc quan"
+        ],
+        "challenges": [
+          "Thiếu kỷ luật",
+          "Phân tán",
+          "Ngại chiều sâu"
+        ],
+        "framing": "hành trình học cách biến cảm hứng thành thành quả cụ thể và giữ kỷ luật",
+        "masterNote": "",
+        "hub": "so-chu-dao",
+        "siblings": [
+          "so-chu-dao-1",
+          "so-chu-dao-2",
+          "so-chu-dao-4",
+          "so-chu-dao-5",
+          "so-chu-dao-6",
+          "so-chu-dao-7",
+          "so-chu-dao-8",
+          "so-chu-dao-9",
+          "so-chu-dao-10",
+          "so-chu-dao-11",
+          "so-chu-dao-22",
+          "so-chu-dao-33"
+        ]
+      }
+    },
+    {
+      "item_key": "so-chu-dao-4",
+      "input_data": {
+        "n": 4,
+        "label": "Số chủ đạo",
+        "archetype": "Người xây dựng",
+        "keyword": "Nền tảng & bền bỉ",
+        "essence": "Số 4 là năng lượng nền tảng — thực tế, chỉn chu và bền bỉ. Người mang số 4 tạo ra sự ổn định, biến kế hoạch thành cấu trúc vững chắc và là chỗ dựa đáng tin cậy.",
+        "strengths": [
+          "Kỷ luật",
+          "Đáng tin",
+          "Kiên trì"
+        ],
+        "challenges": [
+          "Cứng nhắc",
+          "Ngại thay đổi",
+          "Quá cầu toàn"
+        ],
+        "framing": "hành trình học cách tạo nền tảng vững chắc trong khi vẫn giữ được sự linh hoạt",
+        "masterNote": "",
+        "hub": "so-chu-dao",
+        "siblings": [
+          "so-chu-dao-1",
+          "so-chu-dao-2",
+          "so-chu-dao-3",
+          "so-chu-dao-5",
+          "so-chu-dao-6",
+          "so-chu-dao-7",
+          "so-chu-dao-8",
+          "so-chu-dao-9",
+          "so-chu-dao-10",
+          "so-chu-dao-11",
+          "so-chu-dao-22",
+          "so-chu-dao-33"
+        ]
+      }
+    },
+    {
+      "item_key": "so-chu-dao-5",
+      "input_data": {
+        "n": 5,
+        "label": "Số chủ đạo",
+        "archetype": "Người tự do",
+        "keyword": "Trải nghiệm & thay đổi",
+        "essence": "Số 5 là năng lượng của tự do — tò mò, năng động và không sợ đổi thay. Người mang số 5 cần không gian để trải nghiệm và lan toả tinh thần phiêu lưu tới mọi người.",
+        "strengths": [
+          "Linh hoạt",
+          "Năng động",
+          "Ham học hỏi"
+        ],
+        "challenges": [
+          "Phân tán",
+          "Bốc đồng",
+          "Ngại cam kết"
+        ],
+        "framing": "hành trình học cách tìm tự do bên trong kỷ luật thay vì chạy theo đổi thay liên tục",
+        "masterNote": "",
+        "hub": "so-chu-dao",
+        "siblings": [
+          "so-chu-dao-1",
+          "so-chu-dao-2",
+          "so-chu-dao-3",
+          "so-chu-dao-4",
+          "so-chu-dao-6",
+          "so-chu-dao-7",
+          "so-chu-dao-8",
+          "so-chu-dao-9",
+          "so-chu-dao-10",
+          "so-chu-dao-11",
+          "so-chu-dao-22",
+          "so-chu-dao-33"
+        ]
+      }
+    },
+    {
+      "item_key": "so-chu-dao-6",
+      "input_data": {
+        "n": 6,
+        "label": "Số chủ đạo",
+        "archetype": "Người chăm sóc",
+        "keyword": "Trách nhiệm & yêu thương",
+        "essence": "Số 6 là năng lượng nuôi dưỡng — trách nhiệm, ấm áp và bao dung. Người mang số 6 tạo cảm giác an toàn cho gia đình và cộng đồng, luôn muốn chăm sóc và gắn kết mọi người.",
+        "strengths": [
+          "Tận tâm",
+          "Ấm áp",
+          "Bao dung"
+        ],
+        "challenges": [
+          "Ôm đồm",
+          "Hy sinh quá mức",
+          "Kiểm soát"
+        ],
+        "framing": "hành trình học cách chăm sóc người khác mà không đánh mất bản thân",
+        "masterNote": "",
+        "hub": "so-chu-dao",
+        "siblings": [
+          "so-chu-dao-1",
+          "so-chu-dao-2",
+          "so-chu-dao-3",
+          "so-chu-dao-4",
+          "so-chu-dao-5",
+          "so-chu-dao-7",
+          "so-chu-dao-8",
+          "so-chu-dao-9",
+          "so-chu-dao-10",
+          "so-chu-dao-11",
+          "so-chu-dao-22",
+          "so-chu-dao-33"
+        ]
+      }
+    },
+    {
+      "item_key": "so-chu-dao-7",
+      "input_data": {
+        "n": 7,
+        "label": "Số chủ đạo",
+        "archetype": "Nhà tư duy",
+        "keyword": "Trí tuệ & chiều sâu",
+        "essence": "Số 7 là năng lượng của chiều sâu — trực giác, trí tuệ và nhu cầu thấu hiểu thế giới bên trong. Người mang số 7 luôn đi tìm ý nghĩa và sự thật phía sau bề mặt, cần sự tĩnh lặng để chiêm nghiệm và dễ trở thành người quan sát sắc bén mà ít ai đọc thấu.",
+        "strengths": [
+          "Trực giác",
+          "Phân tích",
+          "Sâu sắc"
+        ],
+        "challenges": [
+          "Khép kín",
+          "Hoài nghi",
+          "Xa cách cảm xúc"
+        ],
+        "framing": "hành trình đi tìm ý nghĩa và sự thật phía sau mọi điều, học cách mở lòng chia sẻ trí tuệ bên trong",
+        "masterNote": "",
+        "hub": "so-chu-dao",
+        "siblings": [
+          "so-chu-dao-1",
+          "so-chu-dao-2",
+          "so-chu-dao-3",
+          "so-chu-dao-4",
+          "so-chu-dao-5",
+          "so-chu-dao-6",
+          "so-chu-dao-8",
+          "so-chu-dao-9",
+          "so-chu-dao-10",
+          "so-chu-dao-11",
+          "so-chu-dao-22",
+          "so-chu-dao-33"
+        ]
+      }
+    },
+    {
+      "item_key": "so-chu-dao-8",
+      "input_data": {
+        "n": 8,
+        "label": "Số chủ đạo",
+        "archetype": "Người kiến tạo",
+        "keyword": "Thành tựu & ảnh hưởng",
+        "essence": "Số 8 là năng lượng quyền lực — tham vọng, thực tế và giỏi tạo ra giá trị vật chất. Người mang số 8 dùng bản lĩnh và khả năng tổ chức để tạo thành tựu và ảnh hưởng lên môi trường quanh mình.",
+        "strengths": [
+          "Tham vọng",
+          "Bản lĩnh",
+          "Tổ chức"
+        ],
+        "challenges": [
+          "Đề cao vật chất",
+          "Ôm áp lực",
+          "Cứng rắn"
+        ],
+        "framing": "hành trình học cách cân bằng thành tựu bên ngoài với đời sống nội tâm",
+        "masterNote": "",
+        "hub": "so-chu-dao",
+        "siblings": [
+          "so-chu-dao-1",
+          "so-chu-dao-2",
+          "so-chu-dao-3",
+          "so-chu-dao-4",
+          "so-chu-dao-5",
+          "so-chu-dao-6",
+          "so-chu-dao-7",
+          "so-chu-dao-9",
+          "so-chu-dao-10",
+          "so-chu-dao-11",
+          "so-chu-dao-22",
+          "so-chu-dao-33"
+        ]
+      }
+    },
+    {
+      "item_key": "so-chu-dao-9",
+      "input_data": {
+        "n": 9,
+        "label": "Số chủ đạo",
+        "archetype": "Người nhân ái",
+        "keyword": "Bao dung & cống hiến",
+        "essence": "Số 9 là năng lượng của lòng nhân ái — vị tha, lý tưởng và hướng tới điều lớn lao hơn bản thân. Người mang số 9 sống chính trực, giàu cảm thông và truyền cảm hứng cho người khác bằng tấm lòng rộng mở.",
+        "strengths": [
+          "Vị tha",
+          "Lý tưởng",
+          "Cảm thông"
+        ],
+        "challenges": [
+          "Khó buông bỏ",
+          "Ôm nỗi buồn của người khác",
+          "Thiếu ranh giới"
+        ],
+        "framing": "hành trình học cách cho đi, buông bỏ và đặt ranh giới lành mạnh",
+        "masterNote": "",
+        "hub": "so-chu-dao",
+        "siblings": [
+          "so-chu-dao-1",
+          "so-chu-dao-2",
+          "so-chu-dao-3",
+          "so-chu-dao-4",
+          "so-chu-dao-5",
+          "so-chu-dao-6",
+          "so-chu-dao-7",
+          "so-chu-dao-8",
+          "so-chu-dao-10",
+          "so-chu-dao-11",
+          "so-chu-dao-22",
+          "so-chu-dao-33"
+        ]
+      }
+    },
+    {
+      "item_key": "so-chu-dao-10",
+      "input_data": {
+        "n": 10,
+        "label": "Số chủ đạo",
+        "archetype": "Khởi đầu viên mãn",
+        "keyword": "Chu kỳ mới ở tầng cao",
+        "essence": "Số chủ đạo 10 rút gọn về số 1 (1 + 0 = 1) nên mang trọn năng lượng khởi đầu, tự quyết và dẫn dắt của số 1 — nhưng ở một tầng \"cao hơn\": số 0 khuếch đại tiềm năng, đánh dấu sự khép lại một chu kỳ để mở ra khởi đầu mới với trí tuệ đã tích luỹ. Người mang số 10 vừa có sức bật tiên phong, vừa được kỳ vọng gánh vác vai trò mở đường.",
+        "strengths": [
+          "Tự chủ",
+          "Bản lĩnh",
+          "Khởi tạo"
+        ],
+        "challenges": [
+          "Kỳ vọng quá cao",
+          "Ngại nhờ giúp",
+          "Áp lực dẫn đầu"
+        ],
+        "framing": "hành trình khởi tạo và dẫn dắt với bản lĩnh của người đã đi trọn một vòng và bắt đầu lại ở tầm cao hơn",
+        "masterNote": "",
+        "hub": "so-chu-dao",
+        "siblings": [
+          "so-chu-dao-1",
+          "so-chu-dao-2",
+          "so-chu-dao-3",
+          "so-chu-dao-4",
+          "so-chu-dao-5",
+          "so-chu-dao-6",
+          "so-chu-dao-7",
+          "so-chu-dao-8",
+          "so-chu-dao-9",
+          "so-chu-dao-11",
+          "so-chu-dao-22",
+          "so-chu-dao-33"
+        ]
+      }
+    },
+    {
+      "item_key": "so-chu-dao-11",
+      "input_data": {
+        "n": 11,
+        "label": "Số chủ đạo",
+        "archetype": "Trực giác bậc thầy",
+        "keyword": "Số bậc thầy",
+        "essence": "Số 11 là số bậc thầy của trực giác — nhạy bén, truyền cảm hứng và soi thấu điều người khác chưa nhìn ra. Cùng món quà đó là áp lực nội tâm lớn, đòi hỏi người mang số 11 học cách cân bằng cảm xúc.",
+        "strengths": [
+          "Trực giác mạnh",
+          "Truyền cảm hứng",
+          "Nhạy cảm"
+        ],
+        "challenges": [
+          "Áp lực nội tâm",
+          "Bất ổn cảm xúc",
+          "Tự nghi ngờ"
+        ],
+        "framing": "hành trình học cách giữ vững quyết đoán và cân bằng cảm xúc trước năng lượng trực giác mạnh mẽ",
+        "masterNote": "(số bậc thầy 11/22/33 — không rút gọn tiếp, mang năng lượng khuếch đại)",
+        "hub": "so-chu-dao",
+        "siblings": [
+          "so-chu-dao-1",
+          "so-chu-dao-2",
+          "so-chu-dao-3",
+          "so-chu-dao-4",
+          "so-chu-dao-5",
+          "so-chu-dao-6",
+          "so-chu-dao-7",
+          "so-chu-dao-8",
+          "so-chu-dao-9",
+          "so-chu-dao-10",
+          "so-chu-dao-22",
+          "so-chu-dao-33"
+        ]
+      }
+    },
+    {
+      "item_key": "so-chu-dao-22",
+      "input_data": {
+        "n": 22,
+        "label": "Số chủ đạo",
+        "archetype": "Kiến tạo bậc thầy",
+        "keyword": "Số bậc thầy",
+        "essence": "Số 22 là \"kiến trúc sư bậc thầy\" — biến những ý tưởng lớn thành hiện thực có hệ thống ở quy mô lớn. Người mang số 22 kết hợp tầm nhìn của người mơ mộng với khả năng thực thi thực tế.",
+        "strengths": [
+          "Tầm nhìn lớn",
+          "Thực thi",
+          "Lãnh đạo"
+        ],
+        "challenges": [
+          "Quá tải",
+          "Áp lực kỳ vọng",
+          "Ôm mục tiêu quá lớn"
+        ],
+        "framing": "hành trình học cách chia tầm nhìn lớn thành từng bước để không quá tải",
+        "masterNote": "(số bậc thầy 11/22/33 — không rút gọn tiếp, mang năng lượng khuếch đại)",
+        "hub": "so-chu-dao",
+        "siblings": [
+          "so-chu-dao-1",
+          "so-chu-dao-2",
+          "so-chu-dao-3",
+          "so-chu-dao-4",
+          "so-chu-dao-5",
+          "so-chu-dao-6",
+          "so-chu-dao-7",
+          "so-chu-dao-8",
+          "so-chu-dao-9",
+          "so-chu-dao-10",
+          "so-chu-dao-11",
+          "so-chu-dao-33"
+        ]
+      }
+    },
+    {
+      "item_key": "so-chu-dao-33",
+      "input_data": {
+        "n": 33,
+        "label": "Số chủ đạo",
+        "archetype": "Bao dung bậc thầy",
+        "keyword": "Số bậc thầy",
+        "essence": "Số 33 là số bậc thầy của lòng từ bi — phục vụ, chữa lành và nâng đỡ người khác bằng lý tưởng sống cao đẹp. Người mang số 33 cần học cách giữ ranh giới để không kiệt sức khi cho đi.",
+        "strengths": [
+          "Từ bi",
+          "Phục vụ",
+          "Chữa lành"
+        ],
+        "challenges": [
+          "Kiệt sức khi giúp người",
+          "Ôm trách nhiệm quá lớn",
+          "Bỏ quên bản thân"
+        ],
+        "framing": "hành trình học cách phục vụ và chữa lành mà vẫn giữ ranh giới lành mạnh",
+        "masterNote": "(số bậc thầy 11/22/33 — không rút gọn tiếp, mang năng lượng khuếch đại)",
+        "hub": "so-chu-dao",
+        "siblings": [
+          "so-chu-dao-1",
+          "so-chu-dao-2",
+          "so-chu-dao-3",
+          "so-chu-dao-4",
+          "so-chu-dao-5",
+          "so-chu-dao-6",
+          "so-chu-dao-7",
+          "so-chu-dao-8",
+          "so-chu-dao-9",
+          "so-chu-dao-10",
+          "so-chu-dao-11",
+          "so-chu-dao-22"
+        ]
+      }
+    }
+  ],
+  "priorities": {
+    "so-chu-dao-10": 6100,
+    "so-chu-dao-3": 10130,
+    "so-chu-dao-7": 7910,
+    "so-chu-dao-9": 7650,
+    "so-chu-dao-5": 6970,
+    "so-chu-dao-6": 7050,
+    "so-chu-dao-8": 7160,
+    "so-chu-dao-4": 6860,
+    "so-chu-dao-11": 5540,
+    "so-chu-dao-2": 3930,
+    "so-chu-dao-1": 2000,
+    "so-chu-dao-22": 1910,
+    "so-chu-dao-33": 780
+  }
+}

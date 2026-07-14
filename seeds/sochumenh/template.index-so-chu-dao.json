@@ -1,0 +1,93 @@
+{
+  "key": "index-so-chu-dao",
+  "version": 1,
+  "name": "Số chủ đạo N (chỉ số đơn — index axis)",
+  "model": "claude-sonnet-5",
+  "temperature": 0.7,
+  "max_tokens": 4200,
+  "_model_note": "Golden set (13 items — the full axis, includes master numbers 11/22/33) on claude-sonnet-5. Distill ≤3 approved outputs into few_shots and switch to claude-haiku-4-5 for the batch (already sized: 13 = whole axis, no batch beyond golden).",
+  "_persona_note": "REQUIRES persona.md active (not persona.draft.md) — this template's system_prompt is deliberately slim per the 3-layer model (01-engine-contract.md §1): site doctrine (voice, persuasion arc, ethical DO-NOTs) lives in persona.md and is prepended by the engine at generation. Do not load this template before persona.md exists, or every page ships with zero doctrine.",
+
+  "output_schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["title", "seoTitle", "metaDescription", "meaning", "personality", "career", "love", "bridge", "cta", "faqs"],
+    "properties": {
+      "title":           { "type": "string" },
+      "seoTitle":        { "type": "string" },
+      "metaDescription": { "type": "string" },
+      "meaning":         { "type": "string" },
+      "personality":     { "type": "string" },
+      "career":          { "type": "string" },
+      "love":            { "type": "string" },
+      "bridge":          { "type": "string" },
+      "cta":             { "type": "string" },
+      "faqs": {
+        "type": "array",
+        "minItems": 5,
+        "maxItems": 5,
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["q", "a"],
+          "properties": { "q": { "type": "string" }, "a": { "type": "string" } }
+        }
+      }
+    }
+  },
+
+  "guards": {
+    "schema":            { "severity": "fail" },
+    "unicode":           { "severity": "fail", "form": "NFC" },
+    "length": {
+      "severity": "fail",
+      "fields": {
+        "title":           [20, 70],
+        "seoTitle":        [30, 65],
+        "metaDescription": [120, 165],
+        "meaning":         [400, 700],
+        "personality":     [350, 650],
+        "career":          [300, 600],
+        "love":            [250, 500],
+        "bridge":          [150, 350],
+        "cta":             [80, 220]
+      }
+    },
+    "required_mentions": {
+      "severity": "fail",
+      "rules": [
+        { "field": "title",           "must_contain": ["{n}"] },
+        { "field": "seoTitle",        "must_contain": ["{n}"] },
+        { "field": "metaDescription", "must_contain": ["{n}"] },
+        { "field": "cta",             "must_contain": ["sochumenh"] }
+      ]
+    },
+    "numeric_consistency": {
+      "severity": "fail",
+      "computed": ["n"]
+    },
+    "entity_consistency": {
+      "severity": "flag",
+      "note": "traits (archetype/strengths/challenges) must come from this item's own input_data — never borrow another số chủ đạo's traits, even for comparison"
+    },
+    "banned_phrases": {
+      "severity": "fail",
+      "list": ["chắc chắn giàu", "chắc chắn thành công", "đảm bảo", "chữa khỏi", "đổi tên đổi vận", "100%", "tuyệt đối sẽ"]
+    },
+    "faq_shape": {
+      "severity": "fail",
+      "count": 5,
+      "answers_must_contain": ["{n}"],
+      "note": "exactly 5 faqs; at least one answer states the number explicitly (featured-snippet friendly)"
+    },
+    "phrase_frequency": { "severity": "flag", "scope": "batch" },
+    "similarity":       { "severity": "flag", "scope": "batch", "method": "ngram_tfidf_cosine", "max_pairwise": 0.55 }
+  },
+
+  "system_prompt": "Bạn viết trang \"Số chủ đạo {n}\" cho sochumenh.vn — một chỉ số đơn trong thần số học Pythagoras (KHÔNG phải tổ hợp hai số).\n\nNGUYÊN TẮC BẮT BUỘC (chỉ riêng template này — doctrine giọng văn/đạo đức đã có ở lớp persona, không lặp lại ở đây):\n- Chỉ viết dựa trên DỮ KIỆN được cung cấp (archetype, keyword, essence, strengths, challenges, framing). KHÔNG bịa đặc điểm không có trong dữ kiện; KHÔNG mượn đặc điểm của số khác dù để so sánh.\n- Nếu dữ kiện có ghi chú số bậc thầy (trường masterNote khác rỗng), đây là SỐ BẬC THẦY (11/22/33) — phải nói rõ số này KHÔNG rút gọn tiếp, mang năng lượng khuếch đại của số gốc (11→2, 22→4, 33→6) cộng thêm chiều sâu/áp lực riêng của số bậc thầy. Nếu masterNote rỗng, đây là số thường — không nhắc gì đến \"số bậc thầy\".\n- \"career\" phải trả lời cụ thể \"số chủ đạo {n} hợp nghề gì\" — nêu MÔI TRƯỜNG/DẠNG CÔNG VIỆC phù hợp với strengths, không liệt kê tên nghề cụ thể kiểu quảng cáo tuyển dụng.\n- \"love\" phải trả lời \"số chủ đạo {n} trong tình yêu\" — cách yêu, cách thể hiện, xu hướng trong quan hệ.\n- \"bridge\" là câu chuyển tiếp: thừa nhận trang này nói về số {n} nói chung, rồi mở ra nhu cầu bản đồ số ĐẦY ĐỦ (số sứ mệnh, năm cá nhân, các chỉ số khác) tính từ NGÀY SINH và HỌ TÊN riêng của người đọc — đây là chỗ nối sang \"cta\", không phải một đoạn quảng cáo tách rời.\n- \"cta\" PHẢI nhắc tên \"sochumenh\" và gợi ý MỘT hành động cụ thể tiếp theo.\n- Mở bài và mở đầu MỖI trường (meaning/personality/career/love) phải khác nhau về cấu trúc câu giữa các số. TUYỆT ĐỐI KHÔNG dùng khuôn lặp \"Người mang số chủ đạo {n}...\", \"Số chủ đạo {n} là...\", \"Có những người...\" ở mọi trường. Nếu thấy câu mở giống một số khác đã viết, đổi hẳn cách vào.",
+
+  "user_template": "Viết trang \"Số chủ đạo {n}\" với dữ kiện sau (không tính lại, không bịa thêm):\n\n- Số: {n} {masterNote}\n- Archetype: {archetype}\n- Từ khoá: {keyword}\n- Bản chất: {essence}\n- Điểm mạnh: {strengths}\n- Thách thức: {challenges}\n- Framing đường đời: {framing}\n\nViết theo đúng schema: title (H1 chứa \"Số chủ đạo {n}\", ví dụ \"Số chủ đạo {n} trong thần số học: {archetype}\"), seoTitle (thẻ <title> ngắn cho SERP, KHÁC title), metaDescription, meaning (ý nghĩa mở rộng dựa trên essence — không lặp y nguyên câu essence), personality (tính cách chi tiết hơn từ strengths/challenges), career (hợp nghề gì), love (trong tình yêu), bridge, cta, và đúng 5 FAQ — trong đó BẮT BUỘC có: 1 FAQ \"Số chủ đạo {n} là gì?\", 1 FAQ \"Số chủ đạo {n} hợp nghề gì?\".\n{constraint_notes}",
+
+  "few_shots": [],
+  "few_shots_note": "Start empty (golden set is 100% reviewed). After golden review, promote ≤3 approved outputs spanning DIFFERENT archetypes AND distinct opening styles (incl. at least one master number: 11, 22, or 33) — do not distill items whose openers stamp the same pattern. Never include a few-shot for the item being generated."
+}
