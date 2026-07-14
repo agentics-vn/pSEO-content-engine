@@ -95,6 +95,25 @@ code { font-family: ui-monospace, Menlo, monospace; font-size: 0.92em; }
 .section-head h2 { margin: 0; }
 .actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
 
+.worklist-upload {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.worklist-upload-input {
+  display: none;
+}
+.worklist-upload-name {
+  color: var(--ink-2);
+  font-size: 13px;
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .btn-dark, .btn-yellow, .btn-coral, .btn-ghost {
   border-radius: 999px; padding: 10px 16px; font-weight: 600; font-size: 13px;
 }

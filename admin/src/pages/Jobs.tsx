@@ -1,10 +1,33 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CreateJobInput, DataSource, JobRow, TemplateRow } from '../types';
 import { countComboGrid } from '../lib/comboGrid';
 import { estimateJobCost, jobActualCostUsd, fmtUsd, fmtJobDate, batchStatusLabel } from '../lib/format';
 import { latestPerKey } from '../lib/templates';
 import { drainJob } from '../lib/runJob';
+import {
+  buildCreateJobFromRawJson,
+  clearSavedWorklist,
+  ingestWorklistText,
+  readWorklistFile,
+  restoreWorklistState,
+  saveWorklist,
+} from '../lib/worklistJson';
 import { navigate } from '../router';
+
+const DEFAULT_ITEMS_JSON = '[{"item_key":"so-chu-dao-1-su-menh-1","input_data":{}}]';
+
+function applyFormPatch(
+  patch: ReturnType<typeof restoreWorklistState>['formPatch'],
+  setters: {
+    setTemplateKey: (k: string) => void;
+    setJobMode: (m: 'generate' | 'regenerate') => void;
+    setSamplePct: (n: number) => void;
+  },
+) {
+  if (patch.templateKey) setters.setTemplateKey(patch.templateKey);
+  if (patch.jobMode) setters.setJobMode(patch.jobMode);
+  if (patch.samplePct !== undefined) setters.setSamplePct(patch.samplePct);
+}
 
 export function JobsPage({
   source,
@@ -19,14 +42,18 @@ export function JobsPage({
   const [running, setRunning] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
 
-  const [templateKey, setTemplateKey] = useState('combo-so-chu-dao-su-menh');
+  const init = restoreWorklistState(source.siteSlug, DEFAULT_ITEMS_JSON);
+
+  const [templateKey, setTemplateKey] = useState(init.formPatch.templateKey ?? 'combo-so-chu-dao-su-menh');
   const [master, setMaster] = useState<'exclude' | 'only' | 'all'>('exclude');
-  const [samplePct, setSamplePct] = useState(25);
-  const [jobMode, setJobMode] = useState<'generate' | 'regenerate'>('generate');
-  const [useRaw, setUseRaw] = useState(false);
-  const [itemsJson, setItemsJson] = useState('[{"item_key":"so-chu-dao-1-su-menh-1","input_data":{}}]');
+  const [samplePct, setSamplePct] = useState(init.formPatch.samplePct ?? 25);
+  const [jobMode, setJobMode] = useState<'generate' | 'regenerate'>(init.formPatch.jobMode ?? 'generate');
+  const [useRaw, setUseRaw] = useState(init.useRaw);
+  const [itemsJson, setItemsJson] = useState(init.itemsJson);
+  const [worklistName, setWorklistName] = useState(init.worklistName);
   const [prioritiesJson, setPrioritiesJson] = useState('');
   const [busy, setBusy] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const templateOptions = useMemo(() => latestPerKey(templates), [templates]);
 
@@ -39,6 +66,14 @@ export function JobsPage({
     });
   };
   useEffect(() => { reload(); }, [source]);
+
+  useEffect(() => {
+    const restored = restoreWorklistState(source.siteSlug, DEFAULT_ITEMS_JSON);
+    setItemsJson(restored.itemsJson);
+    setWorklistName(restored.worklistName);
+    setUseRaw(restored.useRaw);
+    applyFormPatch(restored.formPatch, { setTemplateKey, setJobMode, setSamplePct });
+  }, [source.siteSlug]);
 
   useEffect(() => {
     source.getTemplate(templateKey).then((t) => setMaxTokens(t?.max_tokens ?? 4096));
@@ -55,6 +90,60 @@ export function JobsPage({
     ? estimateJobCost(comboCount, maxTokens, selectedTpl.model)
     : null;
 
+  const rawItemCount = useMemo(() => {
+    if (!useRaw) return 0;
+    try {
+      return ingestWorklistText(itemsJson).itemCount;
+    } catch {
+      return 0;
+    }
+  }, [useRaw, itemsJson]);
+
+  const applyWorklist = (text: string, name: string, notifyOk = true) => {
+    try {
+      const ingested = ingestWorklistText(text);
+      setItemsJson(ingested.jsonText);
+      setWorklistName(name);
+      const saveResult = saveWorklist(source.siteSlug, ingested.jsonText, name);
+      applyFormPatch(ingested.formPatch, { setTemplateKey, setJobMode, setSamplePct });
+      setUseRaw(true);
+      if (notifyOk) {
+        const loaded = ingested.isFullBody
+          ? `Loaded ${name} — ${ingested.itemCount} items (full job body)`
+          : `Loaded ${name} — ${ingested.itemCount} items`;
+        if (saveResult === 'quota') {
+          notify(`${loaded} — too large to remember between sessions`, true);
+        } else {
+          notify(loaded);
+        }
+      }
+      return true;
+    } catch {
+      notify('Invalid JSON — use an items array or a worklist.golden.*.json file', true);
+      return false;
+    }
+  };
+
+  const onWorklistFile = async (file: File | undefined) => {
+    if (!file) return;
+    try {
+      const { text, name } = await readWorklistFile(file);
+      applyWorklist(text, name);
+    } catch {
+      notify('Could not read file', true);
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const clearWorklist = () => {
+    setItemsJson(DEFAULT_ITEMS_JSON);
+    setWorklistName('');
+    clearSavedWorklist(source.siteSlug);
+    setUseRaw(false);
+    notify('Cleared worklist');
+  };
+
   const createJob = async () => {
     setBusy(true);
     let input: CreateJobInput = {
@@ -64,20 +153,7 @@ export function JobsPage({
     };
     if (useRaw) {
       try {
-        const parsed = JSON.parse(itemsJson);
-        if (Array.isArray(parsed)) {
-          input = { ...input, items: parsed };
-        } else if (parsed && typeof parsed === 'object') {
-          // Full job body (a worklist.golden.*.json pastes VERBATIM): its keys
-          // win over the form fields, so template_key/mode/review_sample_pct/
-          // priorities travel with the file the strategist authored.
-          const allowed = ['template_key', 'template_version', 'items', 'item_keys', 'mode', 'priorities', 'review_sample_pct'] as const;
-          const body = Object.fromEntries(Object.entries(parsed).filter(([k]) => (allowed as readonly string[]).includes(k)));
-          if (!body.items && !body.item_keys) throw new Error('no items/item_keys');
-          input = { ...input, ...body } as CreateJobInput;
-        } else {
-          throw new Error('not an array or object');
-        }
+        input = buildCreateJobFromRawJson(itemsJson, input);
       } catch {
         notify('Invalid JSON — paste an items array OR a full job body (worklist file)', true);
         setBusy(false);
@@ -106,6 +182,7 @@ export function JobsPage({
     }
     const res = await source.createJob(input);
     if (res.ok) {
+      if (useRaw) saveWorklist(source.siteSlug, itemsJson, worklistName || 'pasted worklist');
       notify(`Created ${res.item_count ?? 0} items`);
       setShowCreate(false);
       reload();
@@ -196,10 +273,39 @@ export function JobsPage({
               </div>
             ) : (
               <div className="full">
-                <textarea rows={6} className="code-input" value={itemsJson} onChange={(e) => setItemsJson(e.target.value)} />
+                <div className="worklist-upload">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".json,application/json"
+                    className="worklist-upload-input"
+                    onChange={(e) => void onWorklistFile(e.target.files?.[0])}
+                  />
+                  <button
+                    type="button"
+                    className="btn-ghost sm"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    Upload JSON
+                  </button>
+                  {worklistName && (
+                    <span className="worklist-upload-name" title={worklistName}>
+                      {worklistName}
+                    </span>
+                  )}
+                  <button type="button" className="btn-ghost sm" onClick={clearWorklist}>
+                    Clear
+                  </button>
+                </div>
+                <textarea rows={6} className="code-input" value={itemsJson} onChange={(e) => {
+                  setItemsJson(e.target.value);
+                  setWorklistName('');
+                }} />
                 <p className="hint">
-                  Accepts an <code>items</code> array, or a FULL job body — paste a
-                  {' '}<code>worklist.golden.*.json</code> verbatim (its template_key/mode/priorities/sample&nbsp;% win over the fields above).
+                  {rawItemCount > 0 ? `${rawItemCount} items loaded` : 'No valid items yet'}
+                  {worklistName ? ` · ${worklistName}` : ''}
+                  {' · '}Upload a <code>worklist.golden.*.json</code> or paste below. Remembered per site between sessions.
+                  Full job body fields (template_key, mode, priorities, sample&nbsp;%) win over the form above.
                 </p>
               </div>
             )}
