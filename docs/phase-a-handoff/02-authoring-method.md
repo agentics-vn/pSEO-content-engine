@@ -91,6 +91,22 @@ Derive, don't improvise:
   cheap),
 - `required_mentions` from the keyword map (each page must name its axis
   values) and the hub & spoke map,
+- **the demand keyword is data, and gates enforce it** — a prompt example
+  alone is luck, not a guarantee. For every keyword-targeted axis:
+  1. Put the primary demand phrase from `keywords.csv` into each work-list
+     item's `input_data`, e.g. `"searchKeyword": "số chủ đạo 7"`.
+  2. Placement: `required_mentions` with `ci: true` on the SERP surfaces —
+     `title`, `seoTitle`, `metaDescription` (`must_contain:
+     ["{searchKeyword}"]`) — and one FAQ answer via `faq_shape`'s
+     `answers_must_contain` if the SERP shows a "là gì" question box.
+  3. Body usage: `keyword_density` (severity `flag`) over the body fields —
+     `{"keywords": ["{searchKeyword}"], "min_count": 2, "max_density": 0.03,
+     "fields": [body fields]}`. Calibrate against a known-good page before
+     tightening. Measured on the sochumenh index-13 golden (approved pages):
+     SERP fields carried the phrase 3× everywhere, but the body only 0–4×
+     (~0.6–2.7% density) — two approved pages never used it in the body at
+     all. That is exactly the drift this gate surfaces: `min_count: 2` would
+     have handed the reviewer 5 of 13 pages to strengthen.
 - `banned_phrases` from the client's compliance list (absolute promises,
   medical/financial claims),
 - `numeric_consistency` / `entity_consistency` from whatever facts the pages
